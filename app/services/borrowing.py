@@ -10,6 +10,7 @@ from app.models.borrowing import Borrowing
 from app.models.user import User
 from app.repositories.borrowing import BorrowingRepository
 from app.schemas.borrowing import BorrowingCreate, BorrowingResponse
+from app.services.reservation import ReservationService
 
 
 class BorrowingService:
@@ -17,8 +18,13 @@ class BorrowingService:
 
     MAX_ACTIVE_BORROWINGS = 5
 
-    def __init__(self, repository: BorrowingRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: BorrowingRepository | None = None,
+        reservation_service: ReservationService | None = None,
+    ) -> None:
         self.repository = repository or BorrowingRepository()
+        self.reservation_service = reservation_service or ReservationService()
 
     def borrow(self, db: Session, user: User, payload: BorrowingCreate) -> BorrowingResponse:
         """Create a borrowing and consume one concurrent slot atomically."""
@@ -28,6 +34,7 @@ class BorrowingService:
                 raise AppError(404, "BOOK_NOT_FOUND", "Book not found")
             if book.is_archived:
                 raise AppError(409, "BOOK_ARCHIVED", "Archived books cannot be borrowed")
+            self.reservation_service.reconcile_locked_book(db, book, datetime.now(UTC))
             locked_user = self.repository.lock_user(db, user.id)
             if locked_user is None:
                 raise AppError(401, "INVALID_TOKEN", "The authentication token is invalid or expired")
@@ -37,11 +44,14 @@ class BorrowingService:
                 raise AppError(409, "ALREADY_BORROWING", "You already have an active borrowing for this book")
             if book.current_borrows_count >= book.max_concurrent_borrows:
                 raise AppError(409, "BOOK_NOT_AVAILABLE", "This book has no available borrowing slots")
+            if not self.reservation_service.can_borrow_locked_book(db, locked_user.id, book.id):
+                raise AppError(409, "BOOK_NOT_AVAILABLE", "This book's available slot is reserved for another user")
 
             borrowing = self.repository.create(
                 db, user_id=locked_user.id, book_id=book.id, due_date=payload.due_date
             )
             book.current_borrows_count += 1
+            self.reservation_service.fulfill_ready_reservation(db, locked_user.id, book.id)
             db.commit()
             db.refresh(borrowing)
             return self._response(borrowing)
@@ -73,6 +83,7 @@ class BorrowingService:
             if book.current_borrows_count <= 0:
                 raise AppError(409, "BORROW_COUNT_INVALID", "Book borrowing count is inconsistent")
             book.current_borrows_count -= 1
+            self.reservation_service.reconcile_locked_book(db, book, datetime.now(UTC))
             db.commit()
             db.refresh(borrowing)
             return self._response(borrowing)
