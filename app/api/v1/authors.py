@@ -7,12 +7,21 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies.auth import require_admin
-from app.schemas.catalog import AuthorCreate, AuthorResponse, AuthorUpdate
+from app.schemas.catalog import BulkAuthorCreate, BulkAuthorResponse, AuthorCreate, AuthorResponse, AuthorUpdate
 from app.services.catalog import CatalogService
 
 
 router = APIRouter(prefix="/api/v1/authors", tags=["authors"])
 catalog_service = CatalogService()
+
+
+@router.post("/bulk", response_model=BulkAuthorResponse, status_code=status.HTTP_201_CREATED)
+def create_authors_bulk(
+    payload: BulkAuthorCreate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[object, Depends(require_admin)],
+) -> BulkAuthorResponse:
+    return catalog_service.create_authors_bulk(db, payload)
 
 
 @router.get("", response_model=list[AuthorResponse])

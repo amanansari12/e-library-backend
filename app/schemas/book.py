@@ -66,6 +66,17 @@ class BookResponse(BaseModel):
     updated_at: datetime
 
 
+class BulkBookCreate(BaseModel):
+    """A validated batch of individually valid book requests."""
+
+    books: list[BookCreate] = Field(min_length=1)
+
+
+class BulkBookResponse(BaseModel):
+    created: list[BookResponse]
+    count: int
+
+
 class BookPageResponse(BaseModel):
     """Offset-paginated catalog response."""
 

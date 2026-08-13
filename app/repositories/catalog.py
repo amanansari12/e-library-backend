@@ -108,6 +108,11 @@ class CatalogRepository:
             return []
         return list(db.scalars(select(Category).where(Category.id.in_(category_ids))))
 
+    def get_books_by_isbns(self, db: Session, isbns: list[str]) -> list[Book]:
+        if not isbns:
+            return []
+        return list(db.scalars(select(Book).where(Book.isbn.in_(isbns))))
+
     def rating_stats(self, db: Session, book_id: int) -> tuple[float | None, int]:
         average, count = db.execute(
             select(func.avg(Rating.score), func.count(Rating.id)).where(Rating.book_id == book_id)

@@ -30,6 +30,10 @@ PostgreSQL         Userfacet AI API
 
 The backend is a **modular monolith**.
 
+### Additional operational enhancement: Bulk Catalog Creation
+
+Bulk catalog endpoints were added separately from the canonical phase roadmap as an admin operational enhancement. `POST /api/v1/authors/bulk`, `POST /api/v1/categories/bulk`, and `POST /api/v1/books/bulk` preserve the existing author/category-to-book many-to-many domain model, use atomic batches, and do not trigger AI summary generation.
+
 ---
 
 ## 2. Goals

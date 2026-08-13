@@ -8,8 +8,18 @@ from app.models.author import Author
 from app.models.book import Book
 from app.models.category import Category
 from app.repositories.catalog import CatalogRepository
-from app.schemas.book import BookCreate, BookPageResponse, BookResponse, BookUpdate
-from app.schemas.catalog import AuthorCreate, AuthorUpdate, CategoryCreate, CategoryUpdate
+from app.core.config import get_settings
+from app.schemas.book import BulkBookCreate, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.schemas.catalog import (
+    AuthorCreate,
+    AuthorUpdate,
+    BulkAuthorCreate,
+    BulkAuthorResponse,
+    BulkCategoryCreate,
+    BulkCategoryResponse,
+    CategoryCreate,
+    CategoryUpdate,
+)
 
 
 class CatalogService:
@@ -68,6 +78,46 @@ class CatalogService:
         self._commit(db, "A book with this ISBN already exists")
         return self.get_book(db, book.id)
 
+    def create_books_bulk(self, db: Session, payload: BulkBookCreate) -> BulkBookResponse:
+        """Create a whole book batch and its many-to-many links atomically."""
+        self._validate_batch_size(len(payload.books))
+        isbns = [book.isbn.strip() for book in payload.books]
+        if len(isbns) != len(set(isbns)):
+            raise AppError(409, "DUPLICATE_ISBN", "Book ISBNs must be unique within a batch")
+        if self.repository.get_books_by_isbns(db, isbns):
+            raise AppError(409, "CONFLICT", "A book with one of these ISBNs already exists")
+
+        author_ids = [author_id for book in payload.books for author_id in book.author_ids]
+        category_ids = [category_id for book in payload.books for category_id in book.category_ids]
+        authors = {author.id: author for author in self.repository.get_authors(db, list(set(author_ids)))}
+        categories = {
+            category.id: category
+            for category in self.repository.get_categories(db, list(set(category_ids)))
+        }
+        if len(authors) != len(set(author_ids)):
+            raise AppError(404, "AUTHOR_NOT_FOUND", "One or more authors were not found")
+        if len(categories) != len(set(category_ids)):
+            raise AppError(404, "CATEGORY_NOT_FOUND", "One or more categories were not found")
+
+        books: list[Book] = []
+        for item in payload.books:
+            book = Book(
+                title=item.title.strip(),
+                isbn=item.isbn.strip(),
+                description=item.description,
+                content=item.content,
+                publication_year=item.publication_year,
+                max_concurrent_borrows=item.max_concurrent_borrows,
+            )
+            book.authors = [authors[author_id] for author_id in item.author_ids]
+            book.categories = [categories[category_id] for category_id in item.category_ids]
+            db.add(book)
+            books.append(book)
+        self._commit(db, "A book with one of these ISBNs already exists")
+        return BulkBookResponse(
+            created=[self.get_book(db, book.id) for book in books], count=len(books)
+        )
+
     def update_book(self, db: Session, book_id: int, payload: BookUpdate) -> BookResponse:
         book = self._require_book(db, book_id)
         updates = payload.model_dump(exclude_unset=True)
@@ -107,6 +157,19 @@ class CatalogService:
         db.refresh(author)
         return author
 
+    def create_authors_bulk(self, db: Session, payload: BulkAuthorCreate) -> BulkAuthorResponse:
+        """Create an author batch within one transaction."""
+        self._validate_batch_size(len(payload.authors))
+        authors = [
+            Author(name=item.name.strip(), biography=item.biography)
+            for item in payload.authors
+        ]
+        db.add_all(authors)
+        self._commit(db, "Unable to create authors")
+        for author in authors:
+            db.refresh(author)
+        return BulkAuthorResponse(created=authors, count=len(authors))
+
     def update_author(self, db: Session, author_id: int, payload: AuthorUpdate) -> Author:
         author = self._require_author(db, author_id)
         updates = payload.model_dump(exclude_unset=True)
@@ -124,6 +187,21 @@ class CatalogService:
         self._commit(db, "A category with this name already exists")
         db.refresh(category)
         return category
+
+    def create_categories_bulk(
+        self, db: Session, payload: BulkCategoryCreate
+    ) -> BulkCategoryResponse:
+        """Create a category batch within one transaction."""
+        self._validate_batch_size(len(payload.categories))
+        categories = [
+            Category(name=item.name.strip(), description=item.description)
+            for item in payload.categories
+        ]
+        db.add_all(categories)
+        self._commit(db, "A category with one of these names already exists")
+        for category in categories:
+            db.refresh(category)
+        return BulkCategoryResponse(created=categories, count=len(categories))
 
     def update_category(self, db: Session, category_id: int, payload: CategoryUpdate) -> Category:
         category = self._require_category(db, category_id)
@@ -195,3 +273,8 @@ class CatalogService:
         except IntegrityError as exc:
             db.rollback()
             raise AppError(409, "CONFLICT", message) from exc
+
+    @staticmethod
+    def _validate_batch_size(count: int) -> None:
+        if count > get_settings().catalog_bulk_max_items:
+            raise AppError(422, "BATCH_TOO_LARGE", "Bulk request exceeds the configured item limit")

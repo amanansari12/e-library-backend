@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     ai_api_base_url: str = "https://ai-api.userfacet.com"
     ai_api_token: str = ""
+    ai_api_timeout_seconds: float = Field(default=15.0, gt=0)
+    ai_summary_max_source_chars: int = Field(default=12000, gt=0, le=50000)
+    ai_summary_rate_limit: str = "10/hour"
+    catalog_bulk_max_items: int = Field(default=50, ge=1, le=500)
 
     cors_origins: str = "http://localhost:3000"
 

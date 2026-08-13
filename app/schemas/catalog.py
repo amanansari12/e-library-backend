@@ -24,6 +24,17 @@ class AuthorResponse(BaseModel):
     created_at: datetime
 
 
+class BulkAuthorCreate(BaseModel):
+    """A validated batch of individually valid author requests."""
+
+    authors: list[AuthorCreate] = Field(min_length=1)
+
+
+class BulkAuthorResponse(BaseModel):
+    created: list[AuthorResponse]
+    count: int
+
+
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = None
@@ -41,3 +52,14 @@ class CategoryResponse(BaseModel):
     name: str
     description: str | None
     created_at: datetime
+
+
+class BulkCategoryCreate(BaseModel):
+    """A validated batch of individually valid category requests."""
+
+    categories: list[CategoryCreate] = Field(min_length=1)
+
+
+class BulkCategoryResponse(BaseModel):
+    created: list[CategoryResponse]
+    count: int

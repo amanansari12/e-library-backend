@@ -1,7 +1,9 @@
 """FastAPI application entry point."""
 
 from fastapi import FastAPI
+from slowapi.errors import RateLimitExceeded
 
+from app.api.v1.ai import router as ai_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.authors import router as authors_router
 from app.api.v1.books import router as books_router
@@ -11,9 +13,11 @@ from app.api.v1.favorites import router as favorites_router
 from app.api.v1.health import router as health_router
 from app.api.v1.reservations import router as reservations_router
 from app.api.v1.ratings import router as ratings_router
+from app.api.v1.summaries import router as summaries_router
 from app.api.v1.users import router as users_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError, app_error_handler
+from app.core.rate_limit import limiter, rate_limit_error_handler
 from app.middleware.cors import configure_cors
 
 
@@ -26,11 +30,15 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
     application.add_exception_handler(AppError, app_error_handler)
+    application.state.limiter = limiter
+    application.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
     configure_cors(application, settings)
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(users_router)
     application.include_router(books_router)
+    application.include_router(ai_router)
+    application.include_router(summaries_router)
     application.include_router(borrowings_router)
     application.include_router(reservations_router)
     application.include_router(favorites_router)

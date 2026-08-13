@@ -8,12 +8,21 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies.auth import require_admin
 from app.core.exceptions import AppError
-from app.schemas.book import BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.schemas.book import BulkBookCreate, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
 from app.services.catalog import CatalogService
 
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"])
 catalog_service = CatalogService()
+
+
+@router.post("/bulk", response_model=BulkBookResponse, status_code=status.HTTP_201_CREATED)
+def create_books_bulk(
+    payload: BulkBookCreate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[object, Depends(require_admin)],
+) -> BulkBookResponse:
+    return catalog_service.create_books_bulk(db, payload)
 
 
 @router.get("", response_model=BookPageResponse)

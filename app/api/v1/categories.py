@@ -7,12 +7,21 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies.auth import require_admin
-from app.schemas.catalog import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.schemas.catalog import BulkCategoryCreate, BulkCategoryResponse, CategoryCreate, CategoryResponse, CategoryUpdate
 from app.services.catalog import CatalogService
 
 
 router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
 catalog_service = CatalogService()
+
+
+@router.post("/bulk", response_model=BulkCategoryResponse, status_code=status.HTTP_201_CREATED)
+def create_categories_bulk(
+    payload: BulkCategoryCreate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[object, Depends(require_admin)],
+) -> BulkCategoryResponse:
+    return catalog_service.create_categories_bulk(db, payload)
 
 
 @router.get("", response_model=list[CategoryResponse])

@@ -1297,7 +1297,67 @@ Phase 4.
 
 ---
 
+## Additional Feature: Bulk Catalog Creation
+
+> This is an additional operational enhancement added after official Phase 10. It is **not** part of the original Phase 1–13 roadmap and is intentionally separated from the canonical phase sequence below.
+
+### Purpose
+
+Bulk Catalog Creation makes admin catalog entry and development data preparation more efficient without changing the existing catalog domain model, single-resource endpoints, or official roadmap phases.
+
+### Admin-only endpoints
+
+```text
+POST /api/v1/authors/bulk
+POST /api/v1/categories/bulk
+POST /api/v1/books/bulk
+```
+
+All three endpoints require the existing `require_admin` authorization dependency. The original single-create contracts remain unchanged:
+
+```text
+POST /api/v1/authors
+POST /api/v1/categories
+POST /api/v1/books
+```
+
+### Batch and transaction behavior
+
+- `CATALOG_BULK_MAX_ITEMS` configures the maximum number of items in each request; the default is 50.
+- Each bulk operation validates its complete batch and commits once.
+- Invalid author/category references, duplicate category conflicts, and ISBN conflicts cause the entire relevant batch to roll back.
+- ISBNs must also be unique within a bulk-book request.
+- No migration is required; the feature reuses the existing catalog tables and constraints.
+
+### Relationship and AI behavior
+
+Bulk books preserve the existing many-to-many relationships:
+
+- One book may reference multiple authors and multiple categories.
+- One author or category may be associated with multiple books.
+- Existing records are referenced by ID; bulk creation does not duplicate authors or categories for shared relationships.
+- Books keep the same normal defaults as single creation, including `content_version = 1`, no active borrows, and not archived.
+- Bulk creation never generates AI summaries automatically; summaries remain an explicit separate operation.
+
+### Roadmap relationship
+
+```text
+Official roadmap:
+Phase 1 -> ... -> Phase 10 -> Phase 11 -> ... -> Phase 13
+
+Additional feature:
+Bulk Catalog Creation
+    added after Phase 10
+    does not replace, renumber, or alter any official phase
+```
+
+Verification for this additional feature is part of the current suite: `75 passed`, with `alembic check` reporting no new upgrade operations and revision `20260813_0001 (head)`.
+
+---
+
 # 16. Phase 11: Admin Statistics
+
+> Note: Bulk Catalog Creation was added separately before this phase as an additional feature; it does not alter this official Phase 11 definition.
 
 ## Objectives
 
