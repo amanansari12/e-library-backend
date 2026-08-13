@@ -10,6 +10,7 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.favorites import router as favorites_router
 from app.api.v1.health import router as health_router
 from app.api.v1.reservations import router as reservations_router
+from app.api.v1.ratings import router as ratings_router
 from app.api.v1.users import router as users_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError, app_error_handler
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     application.include_router(borrowings_router)
     application.include_router(reservations_router)
     application.include_router(favorites_router)
+    application.include_router(ratings_router)
     application.include_router(authors_router)
     application.include_router(categories_router)
     return application
