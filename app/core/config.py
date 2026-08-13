@@ -24,11 +24,19 @@ class Settings(BaseSettings):
     ai_api_timeout_seconds: float = Field(default=15.0, gt=0)
     ai_summary_max_source_chars: int = Field(default=12000, gt=0, le=50000)
     ai_summary_rate_limit: str = "10/hour"
+    auth_registration_rate_limit: str = "5/minute"
+    auth_login_rate_limit: str = "5/minute"
+    review_create_rate_limit: str = "10/hour"
+    book_create_rate_limit: str = "10/hour"
+    bulk_book_upload_rate_limit: str = "5/hour"
+    book_file_replace_rate_limit: str = "10/hour"
     catalog_bulk_max_items: int = Field(default=50, ge=1, le=500)
     book_storage_root: str = "storage"
     max_book_file_size_mb: int = Field(default=100, gt=0, le=1024)
 
     cors_origins: str = "http://localhost:3000"
+    cors_allow_methods: str = "GET,POST,PATCH,DELETE,OPTIONS"
+    cors_allow_headers: str = "Authorization,Content-Type,X-Request-ID"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -49,6 +57,23 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         """Return normalized CORS origins from a comma-separated setting."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def cors_method_list(self) -> list[str]:
+        """Return the explicitly allowed browser methods."""
+        return [method.strip().upper() for method in self.cors_allow_methods.split(",") if method.strip()]
+
+    @property
+    def cors_header_list(self) -> list[str]:
+        """Return the explicitly allowed browser request headers."""
+        return [header.strip() for header in self.cors_allow_headers.split(",") if header.strip()]
+
+    @field_validator("cors_origins")
+    @classmethod
+    def cors_origins_must_not_include_wildcard(cls, value: str) -> str:
+        if "*" in {origin.strip() for origin in value.split(",")}:
+            raise ValueError("CORS origins must be explicit when credentials are enabled")
+        return value
 
     @property
     def max_book_file_size_bytes(self) -> int:

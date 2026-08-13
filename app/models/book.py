@@ -24,10 +24,12 @@ if TYPE_CHECKING:
     from app.models.author import Author
     from app.models.book_summary import BookSummary
     from app.models.book_file import BookFile
+    from app.models.book_review import BookReview
     from app.models.borrowing import Borrowing
     from app.models.category import Category
     from app.models.favorite import Favorite
     from app.models.rating import Rating
+    from app.models.reading_progress import ReadingProgress
     from app.models.reservation import Reservation
 
 
@@ -81,5 +83,7 @@ class Book(Base):
     reservations: Mapped[list["Reservation"]] = relationship(back_populates="book")
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="book")
     ratings: Mapped[list["Rating"]] = relationship(back_populates="book")
+    reviews: Mapped[list["BookReview"]] = relationship(back_populates="book")
+    reading_progress: Mapped[list["ReadingProgress"]] = relationship(back_populates="book")
     summaries: Mapped[list["BookSummary"]] = relationship(back_populates="book")
     files: Mapped[list["BookFile"]] = relationship(back_populates="book", cascade="all, delete-orphan")

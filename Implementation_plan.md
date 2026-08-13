@@ -2,7 +2,7 @@
 
 ## Document Status
 
-**Status:** Original Phases 1–11 complete; post-Phase-11 Digital Book Storage revision and Multipart Bulk Book Upload enhancement complete. Phase 12 and Phase 13 remain pending.
+**Status:** Original Phases 1–11, Phase 12 Cross-Cutting Hardening, post-Phase-11 Digital Book Storage, Multipart Bulk Book Upload, and optional Book Reviews are complete. Post-Phase-12 Reading Progress is complete. Phase 13 remains pending.
 
 **Canonical architecture:** `architecture.md`
 
@@ -33,6 +33,8 @@ The final backend must provide:
 - Reservations / waiting list
 - Favorites
 - Ratings
+- Optional written reviews
+- Reading Progress / Continue Reading state
 - AI-powered standard book summaries
 - AI summary caching and quota protection
 - Admin statistics
@@ -238,7 +240,7 @@ Do not create empty abstractions simply to match a diagram.
 
 # 5. Approved Database Model
 
-The original Phase 2 baseline specified 12 entities. The implemented post-Phase-11 architectural revision formally supersedes that baseline with these 13 current entities:
+The original Phase 2 baseline specified 12 entities. The implemented post-phase revisions formally supersede that baseline with these 15 current entities:
 
 1. users
 2. books
@@ -251,8 +253,10 @@ The original Phase 2 baseline specified 12 entities. The implemented post-Phase-
 9. reservations
 10. favorites
 11. ratings
-12. book_summaries
-13. refresh_tokens
+12. book_reviews
+13. reading_progress
+14. book_summaries
+15. refresh_tokens
 
 ---
 
@@ -1464,6 +1468,7 @@ This revision was added after official Phase 11. It does not renumber, rewrite, 
 - Completed baseline: Phases 1 through 11.
 - Completed post-Phase-11 revision: Digital Book Storage and Content Architecture.
 - Completed follow-on enhancement: Multipart Bulk Book Upload.
+- Completed follow-on domain feature: Optional Book Reviews.
 - Remaining official roadmap: Phase 12, Cross-Cutting Hardening; then Phase 13, Seed Data, Documentation, and Final Verification.
 
 ### Decision
@@ -1506,23 +1511,46 @@ Swagger presentation is distinct from backend behavior: the upload OpenAPI schem
 
 ---
 
+## Post-Phase 11 Domain Feature: Optional Book Reviews
+
+This focused domain feature was added after the completed Digital Book Storage revision and Multipart Bulk Book Upload enhancement. It does not alter the completed Phase 9 ratings work, renumber official phases, redesign `BookFile`, or change the existing storage architecture.
+
+### Implemented scope
+
+- Add `book_reviews` with `id`, `user_id`, `book_id`, `review_text`, `created_at`, and `updated_at`.
+- Enforce `UNIQUE(user_id, book_id)` and indexes on `user_id` and `book_id` through migration `20260814_0003`.
+- Provide `POST /api/v1/reviews`, `PATCH /api/v1/reviews/{review_id}`, `DELETE /api/v1/reviews/{review_id}`, `GET /api/v1/reviews/books/{book_id}`, and `GET /api/v1/reviews/me`.
+- Keep Router → Service → Repository → PostgreSQL responsibilities. The repository checks borrowing history with an exact `borrowings.user_id` and `borrowings.book_id` query; reservations do not qualify.
+- Permit a review when the user has any ACTIVE or RETURNED borrowing record for that book, including after return. A review is not required to borrow, return, access, or rate a book.
+- Enforce owner-only update/delete with `403 FORBIDDEN`; current-user listing accepts no arbitrary user ID.
+- Validate review text as 1–2000 characters and reject whitespace-only values without silently rewriting content.
+- Preserve historical reviews for archived books and allow historical review creation when the borrowing rule is met.
+- Keep ratings and reviews independent: either, both, or neither may exist for a user/book pair; deleting one does not affect the other.
+- Keep normal book responses lightweight. Complete review lists are retrieved only through the dedicated reviews endpoint.
+
+### Documentation and verification scope
+
+- The implemented domain model now has 15 entities/association tables, including `book_reviews` and `reading_progress`, and no `books.content` column.
+- Tests cover creation eligibility, returned borrowing eligibility, reservation non-eligibility, duplicate protection, review text validation, IDOR protection, listing scope, archive preservation, database metadata, and rating/review independence.
+- Full regression and Alembic verification are required before proceeding to Phase 12.
+
+---
+
 # 17. Phase 12: Cross-Cutting Hardening
+
+**Status: Completed after post-Phase-11 digital storage, bulk upload, and optional reviews. No database migration was required.**
 
 ## Tasks
 
 Implement or finalize:
 
-- slowapi rate limiting.
-- Request-ID middleware.
-- CORS.
-- Common exception handlers.
-- Structured logging.
-- OpenAPI tags/descriptions.
-- Common pagination response schema.
-- Final authorization review.
-- Final IDOR review.
-- Final validation review.
-- Final transaction review.
+- Configurable SlowAPI limits for registration, login, AI summary generation, review creation, and admin PDF write endpoints.
+- Request-ID middleware that returns `X-Request-ID` on normal and error responses.
+- Explicit CORS origins, methods, headers, credentials, and exposed request-ID header.
+- Common safe error handlers for domain, validation, framework HTTP, database-integrity, rate-limit, and unexpected errors.
+- Lightweight safe request/failure logging with request correlation and no secrets or request bodies.
+- OpenAPI documentation for binary PDF streaming and protected multipart file endpoints.
+- Final authorization/IDOR, validation, transaction, storage, review, and AI-token review.
 
 ## Security checklist
 
@@ -1548,6 +1576,15 @@ At minimum protect:
 
 Do not create custom in-memory rate-limit dictionaries.
 
+## Completed verification scope
+
+- Existing borrowing, reservations, favorites, ratings, reviews, BookFile, storage abstraction, bulk uploads, and AI cache architecture were retained after review.
+- Ownership controls protect review edit/delete, borrowing return, reservation cancellation, favorite/rating removal behavior, current-user lists, and active-borrower PDF access.
+- Storage keys remain generated/server-controlled; upload validation and filesystem compensating cleanup remain unchanged.
+- Book pagination remains bounded (`page >= 1`, `1 <= page_size <= 100`) with deterministic secondary-ID ordering. Other existing list endpoints have deterministic ordering but do not introduce a competing pagination format in Phase 12.
+- No migration was required because this phase changes HTTP/middleware/configuration behavior rather than the data model.
+- Automated Phase 12 verification: `pytest -q` passed with 96 tests; `alembic check` detected no upgrade operations; `alembic current` reported `20260814_0003 (head)`.
+
 ## Acceptance criteria
 
 - Full suite passes.
@@ -1560,6 +1597,29 @@ Do not create custom in-memory rate-limit dictionaries.
 ## Depends on
 
 Phases 1–11.
+
+---
+
+## Post-Phase-12 Domain Feature: Reading Progress / Continue Reading
+
+This focused feature follows completed Phase 12 and does not renumber official phases, alter the borrowing model, add reader UI, or expand into bookmarks, annotations, analytics, or reading sessions.
+
+### Implemented scope
+
+- Migration `20260814_0004` adds `reading_progress` with `user_id`, `book_id`, `content_version`, `current_page`, `total_pages`, `last_read_at`, and timestamps.
+- The database enforces foreign keys, `UNIQUE(user_id, book_id)`, `total_pages > 0`, `current_page >= 1`, `current_page <= total_pages`, and indexes for user/book lookup.
+- `GET /api/v1/books/{book_id}/progress` retrieves only the authenticated user's saved state; a missing record returns `READING_PROGRESS_NOT_FOUND`.
+- `PUT /api/v1/books/{book_id}/progress` is idempotent and requires an ACTIVE borrowing for the same user/book. It does not create a borrowing or alter borrowing counters.
+- `GET /api/v1/reading-progress/me` supplies private Continue Reading state ordered by `last_read_at DESC, id DESC`.
+- Responses calculate `progress_percent` from `current_page / total_pages`; clients cannot submit percentage, timestamps, user IDs, or content versions.
+- PUT stores the book's current `content_version`. If the book later has another version, historical progress is returned with `is_stale = true`; no page mapping is attempted.
+- Historical progress remains available after return or archive, but a returned borrowing cannot update it. Archive also blocks mutation because existing digital-file access is blocked. Ratings, reviews, favorites, admin statistics, and file storage remain unchanged.
+
+### Verification scope
+
+- Tests cover ACTIVE-vs-returned-vs-reservation eligibility, numeric validation, owner-only reads, idempotent upsert, unique-concurrency behavior, private Continue Reading ordering, stale-version detection, borrowing-counter independence, database metadata, and OpenAPI contracts.
+- Verification: `pytest -q` passed with 107 tests; `alembic upgrade head` applied `20260814_0004`; `alembic check` found no new upgrade operations; `alembic current` reported `20260814_0004 (head)`.
+- Phase 13 remains pending. No seed-data or final-project work begins here.
 
 ---
 
@@ -1971,8 +2031,17 @@ AI summaries + cache + quota protection
 Phase 11
 Admin statistics
         ↓
+Post-Phase-11
+Digital book storage + multipart bulk upload
+        ↓
+Post-Phase-11
+Optional book reviews
+        ↓
 Phase 12
 Security + rate limiting + errors + observability
+        ↓
+Post-Phase-12
+Reading progress + Continue Reading state
         ↓
 Phase 13
 Seed data + README + final verification
@@ -1998,7 +2067,7 @@ Before writing code:
 
 1. Confirm synchronous execution.
 2. Confirm no Docker is required.
-3. Confirm the current 13-entity domain model, including `BookFile` and no `books.content` field.
+3. Confirm the current 14-entity domain model, including `BookFile`, `BookReview`, and no `books.content` field.
 4. Confirm a single standard AI summary.
 5. Confirm cache key `(book_id, content_version)`.
 6. Confirm unique AI cache constraint.

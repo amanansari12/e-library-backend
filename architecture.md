@@ -4,7 +4,7 @@
 
 This document is the canonical architecture for the E-Library Management System backend.
 
-The system is a student-level, modular monolith built with Python and FastAPI. It provides book management, controlled digital-book storage and access, users, borrowing, searching, reservations, favorites, ratings, admin statistics, and AI-powered book summaries.
+The system is a student-level, modular monolith built with Python and FastAPI. It provides book management, controlled digital-book storage and access, users, borrowing, searching, reservations, favorites, ratings, optional written reviews, admin statistics, and AI-powered book summaries.
 
 The architecture intentionally avoids unnecessary enterprise infrastructure. The project should be realistic for one student to implement, test, understand, and defend in an interview.
 
@@ -224,6 +224,25 @@ Regular users should use `/users/me` rather than arbitrary user IDs.
 - Get ratings for a book
 - Average rating
 - Rating count
+
+### Reviews
+
+- Create an optional review after borrowing a book at least once
+- Update own review
+- Delete own review
+- List book reviews
+- List current user's reviews
+- One review per user/book
+- Keep written reviews independent from 1–5 ratings
+
+### Reading Progress
+
+- Set current page and total pages only while actively borrowing a book
+- Retrieve the current user's historical progress after return
+- List the current user's Continue Reading state
+- One progress record per user/book
+- Derive progress percentage rather than storing it
+- Track the book content version to identify stale page coordinates
 
 ### AI Book Summary
 
@@ -575,6 +594,35 @@ Fields:
 - created_at
 - updated_at
 
+### BookReview
+
+Fields:
+
+- id
+- user_id
+- book_id
+- review_text
+- created_at
+- updated_at
+
+Each user may have one review for a book. Review creation requires a borrowing record for the same `user_id` and `book_id`; an ACTIVE or RETURNED borrowing qualifies. Reservations, favorites, ratings, and book views do not qualify.
+
+### ReadingProgress
+
+Fields:
+
+- id
+- user_id
+- book_id
+- content_version
+- current_page
+- total_pages
+- last_read_at
+- created_at
+- updated_at
+
+Each user has at most one record for a book. `current_page` and `total_pages` are the source of truth; `progress_percent` is derived as `current_page / total_pages * 100` and rounded to two decimal places in API responses.
+
 ### BookSummary
 
 Fields:
@@ -604,7 +652,7 @@ Fields:
 
 ### Implemented database entities
 
-The current schema contains 13 domain entities/association tables: `users`, `books`, `authors`, `categories`, `book_authors`, `book_categories`, `book_files`, `borrowings`, `reservations`, `favorites`, `ratings`, `book_summaries`, and `refresh_tokens`. `book_files` was introduced by migration `20260814_0002`, which also removed `books.content`.
+The current schema contains 15 domain entities/association tables: `users`, `books`, `authors`, `categories`, `book_authors`, `book_categories`, `book_files`, `borrowings`, `reservations`, `favorites`, `ratings`, `book_reviews`, `reading_progress`, `book_summaries`, and `refresh_tokens`. `book_files` was introduced by migration `20260814_0002`, which also removed `books.content`; `book_reviews` was introduced by migration `20260814_0003`; `reading_progress` was introduced by migration `20260814_0004`.
 
 ---
 
@@ -881,7 +929,32 @@ The recommended approach is to retain the relationship but prevent new favorites
 
 ---
 
-## 21. AI Summary Architecture
+## 21. Review Rules
+
+- Reviews are optional; a user may rate without reviewing, review without rating, do both, or do neither.
+- A review is permitted only when the same user has at least one record in `borrowings` for the same book. Both ACTIVE and RETURNED borrowings qualify.
+- A reservation alone never qualifies a user to review.
+- `book_reviews` enforces `UNIQUE(user_id, book_id)`; duplicate creation returns a conflict.
+- Review text is required, cannot be blank or whitespace-only, and is limited to 1–2000 characters without silently rewriting the submitted text.
+- Only the review owner may update or delete it. A non-owner receives `403 FORBIDDEN`.
+- A review does not store, create, update, or delete a rating. Deleting either record does not alter the other.
+- Reviews remain readable after a book is archived. A user with qualifying borrowing history may also add historical feedback for an archived book.
+- Book list and detail responses do not embed complete review lists; `GET /api/v1/reviews/books/{book_id}` is the dedicated read endpoint.
+
+### Reading Progress Rules
+
+- Reading progress is private user state, not an admin analytics feature. It is not coupled to ratings, reviews, favorites, or borrowing counters.
+- `PUT /api/v1/books/{book_id}/progress` requires an ACTIVE borrowing for the exact authenticated user/book pair. Reservations and returned borrowings do not qualify.
+- `GET /api/v1/books/{book_id}/progress` and `GET /api/v1/reading-progress/me` are scoped only to the authenticated user. No endpoint accepts an arbitrary `user_id`.
+- Progress remains readable after return or archival, but cannot be updated without a new ACTIVE borrowing. An archived book also blocks updates because its existing file-access rule blocks further PDF reading.
+- `reading_progress` enforces `UNIQUE(user_id, book_id)`, `total_pages > 0`, `current_page >= 1`, and `current_page <= total_pages`.
+- The server sets `last_read_at`; clients cannot set timestamps, content version, or percentage.
+- On each successful PUT, stored `content_version` is set to the book's current version. If the current book version later differs, responses mark `is_stale = true`; old page numbers are preserved as historical data and never remapped automatically.
+- The backend stores and retrieves state only. The frontend decides how to display Continue Reading, progress bars, and PDF resume navigation.
+
+---
+
+## 22. AI Summary Architecture
 
 Request flow:
 
@@ -922,7 +995,7 @@ Use a maximum of 1000 output tokens for normal generation.
 
 ---
 
-## 22. AI Cache
+## 23. AI Cache
 
 Cache key:
 
@@ -948,7 +1021,7 @@ Before calling the AI API:
 
 ---
 
-## 23. AI Regeneration
+## 24. AI Regeneration
 
 The summary endpoint supports:
 
@@ -970,7 +1043,7 @@ Because regeneration consumes quota, it must still be rate-limited.
 
 ---
 
-## 24. AI Quota Protection
+## 25. AI Quota Protection
 
 The supplied API has a limited quota of 100 calls.
 
@@ -994,7 +1067,7 @@ A distributed locking solution may be discussed as a future improvement.
 
 ---
 
-## 25. AI Token Security
+## 26. AI Token Security
 
 Never hardcode or expose the token.
 
@@ -1017,7 +1090,7 @@ Commit only `.env.example`.
 
 ---
 
-## 26. AI External Error Handling
+## 27. AI External Error Handling
 
 Map the external service failures into clean application errors.
 
@@ -1040,7 +1113,7 @@ Return a safe internal error rather than leaking provider implementation details
 
 ---
 
-## 27. AI Prompt
+## 28. AI Prompt
 
 The generated prompt should use available book information such as:
 
@@ -1060,7 +1133,7 @@ Treat extracted text as untrusted input from a prompt-injection perspective.
 
 ---
 
-## 28. Search
+## 29. Search
 
 Use PostgreSQL-native search.
 
@@ -1083,7 +1156,7 @@ Do not introduce Elasticsearch.
 
 ---
 
-## 29. Pagination
+## 30. Pagination
 
 Use offset pagination.
 
@@ -1111,7 +1184,7 @@ Cursor pagination is a future enhancement only.
 
 ---
 
-## 30. Authentication
+## 31. Authentication
 
 ### Registration
 
@@ -1149,7 +1222,7 @@ Store a server-side representation so it can be revoked.
 
 ---
 
-## 31. Authorization
+## 32. Authorization
 
 Use FastAPI dependencies such as:
 
@@ -1172,7 +1245,7 @@ This prevents IDOR vulnerabilities.
 
 ---
 
-## 32. API Versioning
+## 33. API Versioning
 
 All application endpoints use:
 
@@ -1190,7 +1263,7 @@ AI-related internal endpoints can be grouped consistently under the API version.
 
 ---
 
-## 33. API Groups
+## 34. API Groups
 
 ### Auth
 
@@ -1286,6 +1359,28 @@ GET    /api/v1/ratings/books/{book_id}
 GET    /api/v1/ratings/me
 ```
 
+### Reviews
+
+```text
+POST   /api/v1/reviews
+PATCH  /api/v1/reviews/{review_id}
+DELETE /api/v1/reviews/{review_id}
+GET    /api/v1/reviews/books/{book_id}
+GET    /api/v1/reviews/me
+```
+
+`POST /api/v1/reviews` is authenticated and requires previous borrowing history for the same book. PATCH and DELETE are owner-only. Book-review lists return only safe reviewer display data (`id`, `username`, and `full_name`), never email, password data, tokens, or internal security fields.
+
+### Reading Progress
+
+```text
+GET /api/v1/books/{book_id}/progress
+PUT /api/v1/books/{book_id}/progress
+GET /api/v1/reading-progress/me
+```
+
+The PUT body contains only `current_page` and `total_pages`; it sets one idempotent `(user, book)` state and requires an ACTIVE borrowing. GET returns the current user's historical record when present. Continue Reading returns only the caller's records in `last_read_at DESC, id DESC` order.
+
 ### AI Summaries
 
 ```text
@@ -1318,7 +1413,7 @@ GET /health
 
 ---
 
-## 34. Consistent Error Format
+## 35. Consistent Error Format
 
 Use:
 
@@ -1367,7 +1462,7 @@ Use appropriate HTTP statuses including:
 
 ---
 
-## 35. Admin Statistics
+## 36. Admin Statistics
 
 The statistics subsystem uses PostgreSQL aggregation queries.
 
@@ -1416,7 +1511,7 @@ Admin access only.
 
 ---
 
-## 36. AI Failure Statistics
+## 37. AI Failure Statistics
 
 Persistent AI failure analytics are not required.
 
@@ -1428,34 +1523,42 @@ Do not add a dedicated AI event-sourcing system.
 
 ---
 
-## 37. Rate Limiting
+## 38. Rate Limiting
 
-Use `slowapi` for simple single-instance rate limiting.
+The implementation uses `slowapi` for simple single-instance, per-client-IP rate limiting. The limiter is deliberately local-process only; this project does not require Redis or distributed rate-limit state.
 
-The AI summary endpoint should have a stricter rate limit, such as:
+Configured abuse-sensitive endpoints are:
 
 ```text
-10 requests/hour per IP
+POST /api/v1/auth/register       AUTH_REGISTRATION_RATE_LIMIT (default 5/minute)
+POST /api/v1/auth/login          AUTH_LOGIN_RATE_LIMIT (default 5/minute)
+POST /api/v1/books/{id}/summary  AI_SUMMARY_RATE_LIMIT (default 10/hour)
+POST /api/v1/reviews             REVIEW_CREATE_RATE_LIMIT (default 10/hour)
+POST /api/v1/books               BOOK_CREATE_RATE_LIMIT (default 10/hour)
+POST /api/v1/books/bulk          BULK_BOOK_UPLOAD_RATE_LIMIT (default 5/hour)
+POST /api/v1/books/{id}/file     BOOK_FILE_REPLACE_RATE_LIMIT (default 10/hour)
 ```
 
-The exact value is configuration and should be documented.
+Rate-limit failures return HTTP 429 with `RATE_LIMIT_EXCEEDED` in the standard error envelope.
 
 Do not implement an additional custom in-memory per-user tracker.
 
 ---
 
-## 38. Middleware
+## 39. Middleware
 
-Recommended lightweight middleware:
+Implemented lightweight middleware:
 
-- CORS configuration
-- Request ID
+- CORS configuration with explicit origins, methods, request headers, and credentials.
+- Request ID. Each response includes `X-Request-ID`; a client-provided ID is accepted only when it matches `[A-Za-z0-9_-]{1,128}`, otherwise the server generates a UUID-based value.
+
+Application logs record request completion and safe failure metadata with the request ID, method/path, status, and duration. They do not log request bodies, passwords, access/refresh tokens, AI tokens, uploaded PDF contents, or extracted text.
 
 Do not add complex observability infrastructure.
 
 ---
 
-## 39. Configuration
+## 40. Configuration
 
 Use Pydantic Settings and environment variables.
 
@@ -1476,13 +1579,23 @@ AI_API_BASE_URL=https://ai-api.userfacet.com
 AI_API_TOKEN=your-ai-api-token
 
 CORS_ORIGINS=http://localhost:3000
+CORS_ALLOW_METHODS=GET,POST,PATCH,DELETE,OPTIONS
+CORS_ALLOW_HEADERS=Authorization,Content-Type,X-Request-ID
+
+AUTH_REGISTRATION_RATE_LIMIT=5/minute
+AUTH_LOGIN_RATE_LIMIT=5/minute
+AI_SUMMARY_RATE_LIMIT=10/hour
+REVIEW_CREATE_RATE_LIMIT=10/hour
+BOOK_CREATE_RATE_LIMIT=10/hour
+BULK_BOOK_UPLOAD_RATE_LIMIT=5/hour
+BOOK_FILE_REPLACE_RATE_LIMIT=10/hour
 ```
 
-Actual secrets must never be committed.
+`CORS_ORIGINS` cannot use `*` because credentials are enabled. Actual secrets must never be committed.
 
 ---
 
-## 40. Database Migrations
+## 41. Database Migrations
 
 Use Alembic.
 
@@ -1501,7 +1614,7 @@ Never create a second `alembic.ini` inside `migrations/`.
 
 ---
 
-## 41. Transactions
+## 42. Transactions
 
 Transactions are critical for:
 
@@ -1540,7 +1653,7 @@ Transactions are critical for:
 
 ---
 
-## 42. Testing Strategy
+## 43. Testing Strategy
 
 ### Unit Tests
 
@@ -1597,7 +1710,7 @@ At minimum test or explicitly verify:
 
 ---
 
-## 43. Seed Data
+## 44. Seed Data
 
 Provide deterministic demo data.
 
@@ -1619,7 +1732,7 @@ Credentials used for development/demo should be clearly identified as local seed
 
 ---
 
-## 44. Local Development
+## 45. Local Development
 
 The application must run without Docker.
 
@@ -1665,7 +1778,7 @@ Docker can be mentioned in future improvements but is not a setup requirement.
 
 ---
 
-## 45. README Requirements
+## 46. README Requirements
 
 The final README must describe the actual implementation.
 
@@ -1694,7 +1807,7 @@ The README must not claim that unimplemented features exist.
 
 ---
 
-## 46. Important Trade-offs
+## 47. Important Trade-offs
 
 ### Modular monolith instead of microservices
 
@@ -1732,7 +1845,7 @@ PostgreSQL stores metadata and relational state; local filesystem storage holds 
 
 ---
 
-## 47. Future Improvements
+## 48. Future Improvements
 
 Future work may include:
 
@@ -1754,7 +1867,7 @@ These are not part of the initial implementation.
 
 ---
 
-## 48. Final Implementation Boundary
+## 49. Final Implementation Boundary
 
 ### MUST IMPLEMENT
 
@@ -1801,7 +1914,7 @@ These are not part of the initial implementation.
 
 ---
 
-## 49. Final Architecture Summary
+## 50. Final Architecture Summary
 
 ```text
                     CLIENT
@@ -1838,10 +1951,13 @@ authors
 categories
 book_authors
 book_categories
+book_files
 borrowings
 reservations
 favorites
 ratings
+book_reviews
+reading_progress
 book_summaries
 refresh_tokens
 ```
@@ -1856,6 +1972,8 @@ Borrowing
 Reservations
 Favorites
 Ratings
+Reviews
+Reading Progress
 AI Summaries
 Admin Statistics
 ```

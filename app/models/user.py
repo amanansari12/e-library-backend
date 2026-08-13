@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from app.models.borrowing import Borrowing
     from app.models.favorite import Favorite
     from app.models.rating import Rating
+    from app.models.book_review import BookReview
+    from app.models.reading_progress import ReadingProgress
     from app.models.refresh_token import RefreshToken
     from app.models.reservation import Reservation
 
@@ -41,4 +43,6 @@ class User(Base):
     reservations: Mapped[list["Reservation"]] = relationship(back_populates="user")
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="user")
     ratings: Mapped[list["Rating"]] = relationship(back_populates="user")
+    reviews: Mapped[list["BookReview"]] = relationship(back_populates="user")
+    reading_progress: Mapped[list["ReadingProgress"]] = relationship(back_populates="user")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")

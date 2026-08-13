@@ -3,27 +3,39 @@
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user, require_admin
+from app.core.config import get_settings
 from app.core.exceptions import AppError
+from app.core.rate_limit import limiter
 from app.models.user import User
 from app.schemas.book import BulkBookItem, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.schemas.reading_progress import ReadingProgressResponse, ReadingProgressUpdate
 from app.services.book_file import BookFileService
 from app.services.catalog import CatalogService
+from app.services.reading_progress import ReadingProgressService
 
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"])
 catalog_service = CatalogService()
 book_file_service = BookFileService()
+reading_progress_service = ReadingProgressService()
 
 
-@router.post("/bulk", response_model=BulkBookResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/bulk",
+    response_model=BulkBookResponse,
+    status_code=status.HTTP_201_CREATED,
+    description="ADMIN-only atomic multipart creation. Each file_key maps one uploaded PDF to one book.",
+)
+@limiter.limit(get_settings().bulk_book_upload_rate_limit)
 def create_books_bulk(
+    request: Request,
     books: Annotated[str, Form(description="JSON array of book metadata with unique file_key values")],
     file_manifest: Annotated[str, Form(description="JSON object mapping each file_key to an uploaded filename")],
     files: Annotated[list[UploadFile], File(description="One PDF for each manifest entry")],
@@ -81,8 +93,15 @@ def list_books(
     )
 
 
-@router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=BookResponse,
+    status_code=status.HTTP_201_CREATED,
+    description="ADMIN-only multipart creation of a catalog record and its required validated PDF.",
+)
+@limiter.limit(get_settings().book_create_rate_limit)
 def create_book(
+    request: Request,
     title: Annotated[str, Form(min_length=1, max_length=500)],
     isbn: Annotated[str, Form(min_length=1, max_length=32)],
     file: Annotated[UploadFile, File()],
@@ -106,8 +125,14 @@ def create_book(
     return catalog_service.create_book_with_file(db, payload, file, book_file_service)
 
 
-@router.post("/{book_id}/file", response_model=BookResponse)
+@router.post(
+    "/{book_id}/file",
+    response_model=BookResponse,
+    description="ADMIN-only replacement of an unarchived book's validated PDF.",
+)
+@limiter.limit(get_settings().book_file_replace_rate_limit)
 def replace_book_file(
+    request: Request,
     book_id: int,
     file: Annotated[UploadFile, File()],
     db: Annotated[Session, Depends(get_db)],
@@ -118,7 +143,16 @@ def replace_book_file(
     return catalog_service.get_book(db, book_id)
 
 
-@router.get("/{book_id}/file")
+@router.get(
+    "/{book_id}/file",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "The active PDF binary for an authenticated active borrower.",
+            "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
 def get_book_file(
     book_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -130,6 +164,33 @@ def get_book_file(
         media_type=book_file.mime_type,
         headers={"Content-Disposition": f'inline; filename="{book_file.original_filename}"'},
     )
+
+
+@router.get(
+    "/{book_id}/progress",
+    response_model=ReadingProgressResponse,
+    description="Return only the authenticated user's stored progress, including historical progress after return.",
+)
+def get_reading_progress(
+    book_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ReadingProgressResponse:
+    return reading_progress_service.get_for_book(db, current_user, book_id)
+
+
+@router.put(
+    "/{book_id}/progress",
+    response_model=ReadingProgressResponse,
+    description="Set the authenticated user's page state for the current book version. An ACTIVE borrowing is required.",
+)
+def set_reading_progress(
+    book_id: int,
+    payload: ReadingProgressUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ReadingProgressResponse:
+    return reading_progress_service.set_for_book(db, current_user, book_id, payload)
 
 
 @router.get("/{book_id}", response_model=BookResponse)

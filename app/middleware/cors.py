@@ -12,6 +12,8 @@ def configure_cors(app: FastAPI, settings: Settings) -> None:
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=settings.cors_method_list,
+        allow_headers=settings.cors_header_list,
+        expose_headers=["X-Request-ID"],
+        max_age=600,
     )

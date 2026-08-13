@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.db.base import Base
 from app.db.session import get_db
 import app.models  # noqa: F401 - registers all ORM tables on Base.metadata
@@ -41,6 +42,8 @@ def client(session_factory) -> Generator[TestClient, None, None]:
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    limiter._storage.reset()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    limiter._storage.reset()
