@@ -1,28 +1,52 @@
 """Book catalog routes."""
 
+import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.dependencies.auth import require_admin
+from app.dependencies.auth import get_current_user, require_admin
 from app.core.exceptions import AppError
-from app.schemas.book import BulkBookCreate, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.models.user import User
+from app.schemas.book import BulkBookItem, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.services.book_file import BookFileService
 from app.services.catalog import CatalogService
 
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"])
 catalog_service = CatalogService()
+book_file_service = BookFileService()
 
 
 @router.post("/bulk", response_model=BulkBookResponse, status_code=status.HTTP_201_CREATED)
 def create_books_bulk(
-    payload: BulkBookCreate,
+    books: Annotated[str, Form(description="JSON array of book metadata with unique file_key values")],
+    file_manifest: Annotated[str, Form(description="JSON object mapping each file_key to an uploaded filename")],
+    files: Annotated[list[UploadFile], File(description="One PDF for each manifest entry")],
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[object, Depends(require_admin)],
 ) -> BulkBookResponse:
-    return catalog_service.create_books_bulk(db, payload)
+    """Create an atomic multipart batch where every book has a mapped PDF."""
+    try:
+        payloads = TypeAdapter(list[BulkBookItem]).validate_python(json.loads(books))
+        manifest = json.loads(file_manifest)
+    except (json.JSONDecodeError, ValidationError) as exc:
+        raise AppError(422, "INVALID_BULK_BOOK_PAYLOAD", "Bulk book metadata or file manifest is invalid") from exc
+    if not isinstance(manifest, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in manifest.items()
+    ):
+        raise AppError(422, "INVALID_FILE_MAPPING", "file_manifest must map file keys to uploaded filenames")
+    uploaded_by_name = {upload.filename: upload for upload in files}
+    if len(uploaded_by_name) != len(files) or any(not upload.filename for upload in files):
+        raise AppError(422, "INVALID_FILE_MAPPING", "Uploaded filenames must be present and unique within a batch")
+    if len(set(manifest.values())) != len(manifest) or set(manifest.values()) != set(uploaded_by_name):
+        raise AppError(422, "INVALID_FILE_MAPPING", "file_manifest must reference every uploaded PDF exactly once")
+    uploads_by_key = {file_key: uploaded_by_name[filename] for file_key, filename in manifest.items()}
+    return catalog_service.create_books_bulk_with_files(db, payloads, uploads_by_key, book_file_service)
 
 
 @router.get("", response_model=BookPageResponse)
@@ -57,18 +81,60 @@ def list_books(
     )
 
 
-@router.get("/{book_id}", response_model=BookResponse)
-def get_book(book_id: int, db: Annotated[Session, Depends(get_db)]) -> BookResponse:
-    return catalog_service.get_book(db, book_id)
-
-
 @router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 def create_book(
-    payload: BookCreate,
+    title: Annotated[str, Form(min_length=1, max_length=500)],
+    isbn: Annotated[str, Form(min_length=1, max_length=32)],
+    file: Annotated[UploadFile, File()],
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[object, Depends(require_admin)],
+    description: Annotated[str | None, Form()] = None,
+    publication_year: Annotated[int | None, Form(ge=0, le=9999)] = None,
+    max_concurrent_borrows: Annotated[int, Form(gt=0)] = 3,
+    author_ids: Annotated[list[int], Form()] = [],
+    category_ids: Annotated[list[int], Form()] = [],
+) -> BookResponse:
+    payload = BookCreate(
+        title=title,
+        isbn=isbn,
+        description=description,
+        publication_year=publication_year,
+        max_concurrent_borrows=max_concurrent_borrows,
+        author_ids=author_ids,
+        category_ids=category_ids,
+    )
+    return catalog_service.create_book_with_file(db, payload, file, book_file_service)
+
+
+@router.post("/{book_id}/file", response_model=BookResponse)
+def replace_book_file(
+    book_id: int,
+    file: Annotated[UploadFile, File()],
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[object, Depends(require_admin)],
 ) -> BookResponse:
-    return catalog_service.create_book(db, payload)
+    book = catalog_service._require_book(db, book_id)
+    book_file_service.replace(db, book, file)
+    return catalog_service.get_book(db, book_id)
+
+
+@router.get("/{book_id}/file")
+def get_book_file(
+    book_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> StreamingResponse:
+    book_file, content = book_file_service.stream_for_active_borrower(db, current_user, book_id)
+    return StreamingResponse(
+        content,
+        media_type=book_file.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{book_file.original_filename}"'},
+    )
+
+
+@router.get("/{book_id}", response_model=BookResponse)
+def get_book(book_id: int, db: Annotated[Session, Depends(get_db)]) -> BookResponse:
+    return catalog_service.get_book(db, book_id)
 
 
 @router.patch("/{book_id}", response_model=BookResponse)

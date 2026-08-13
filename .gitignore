@@ -41,3 +41,6 @@ dist/
 # Temporary files
 *.tmp
 *.temp
+
+# Server-managed digital-book files (not the app/storage source package)
+/storage/

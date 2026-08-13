@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.core.security import create_access_token
 from app.models.book import Book
 from app.models.user import User
+from tests.integration.test_catalog import _pdf_bytes
 
 
 def _admin_headers(session_factory) -> dict[str, str]:
@@ -35,15 +36,16 @@ def _build_catalog(client: TestClient, session_factory) -> dict[str, int]:
         response = client.post(
             "/api/v1/books",
             headers=headers,
-            json={
+            data={
                 "title": title,
                 "isbn": isbn,
                 "description": f"Description for {title}",
-                "publication_year": year,
-                "max_concurrent_borrows": capacity,
-                "author_ids": [author_id],
-                "category_ids": [category_id],
+                "publication_year": str(year),
+                "max_concurrent_borrows": str(capacity),
+                "author_ids": str(author_id),
+                "category_ids": str(category_id),
             },
+            files={"file": (f"{isbn}.pdf", _pdf_bytes(), "application/pdf")},
         )
         assert response.status_code == 201
         book_ids.append(response.json()["id"])

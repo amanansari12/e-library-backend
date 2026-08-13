@@ -11,6 +11,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 
+_summary_failure_count = 0
+
+
+def get_summary_failure_count() -> int:
+    """Return the non-persistent count of failed summary provider calls."""
+    return _summary_failure_count
+
+
+def _record_summary_failure() -> None:
+    """Record a failure for the lifetime of this application process only."""
+    global _summary_failure_count
+    _summary_failure_count += 1
+
+
 class SummaryService:
     """Coordinates cache-first standard summary generation and persistence."""
 
@@ -35,6 +49,7 @@ class SummaryService:
         try:
             summary_text, token_count, model = self.ai_client.generate_summary(prompt)
         except AIClientError as exc:
+            _record_summary_failure()
             raise AppError(exc.status_code, exc.code, exc.message) from exc
 
         try:
@@ -82,9 +97,11 @@ class SummaryService:
 
     def _build_prompt(self, book: Book) -> str:
         description = (book.description or "").strip()
-        content = (book.content or "").strip()
-        if not description and not content:
-            raise AppError(422, "INSUFFICIENT_SUMMARY_SOURCE", "Book needs a description or content before it can be summarized")
+        active_file = next((book_file for book_file in book.files if book_file.is_active), None)
+        extracted_text = (active_file.extracted_text if active_file is not None else "") or ""
+        extracted_text = extracted_text.strip()
+        if not description and not extracted_text:
+            raise AppError(422, "INSUFFICIENT_SUMMARY_SOURCE", "Book needs a description or extracted file text before it can be summarized")
         authors = ", ".join(author.name for author in book.authors) or "Not specified"
         categories = ", ".join(category.name for category in book.categories) or "Not specified"
         source = (
@@ -92,7 +109,7 @@ class SummaryService:
             f"Authors: {authors}\n"
             f"Categories: {categories}\n"
             f"Description: {description}\n"
-            f"Content excerpt: {content}"
+            f"Extracted text excerpt: {extracted_text}"
         )[: self.settings.ai_summary_max_source_chars]
         return (
             "Produce a clear, neutral standard summary of this book in no more than 300 words. "

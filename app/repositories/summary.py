@@ -1,7 +1,7 @@
 """Database queries and persistence helpers for the book-summary cache."""
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.book import Book
 from app.models.book_summary import BookSummary
@@ -12,7 +12,9 @@ class SummaryRepository:
 
     def get_book(self, db: Session, book_id: int) -> Book | None:
         return db.scalar(
-            select(Book).where(Book.id == book_id).options()
+            select(Book)
+            .where(Book.id == book_id)
+            .options(selectinload(Book.authors), selectinload(Book.categories), selectinload(Book.files))
         )
 
     def get_cached(self, db: Session, book_id: int, content_version: int) -> BookSummary | None:

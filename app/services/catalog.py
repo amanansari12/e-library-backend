@@ -1,5 +1,6 @@
 """Catalog business workflows."""
 
+from fastapi import UploadFile
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,7 +10,15 @@ from app.models.book import Book
 from app.models.category import Category
 from app.repositories.catalog import CatalogRepository
 from app.core.config import get_settings
-from app.schemas.book import BulkBookCreate, BulkBookResponse, BookCreate, BookPageResponse, BookResponse, BookUpdate
+from app.schemas.book import (
+    BulkBookItem,
+    BulkBookResponse,
+    BookCreate,
+    BookFileMetadata,
+    BookPageResponse,
+    BookResponse,
+    BookUpdate,
+)
 from app.schemas.catalog import (
     AuthorCreate,
     AuthorUpdate,
@@ -20,6 +29,7 @@ from app.schemas.catalog import (
     CategoryCreate,
     CategoryUpdate,
 )
+from app.services.book_file import BookFileService
 
 
 class CatalogService:
@@ -63,32 +73,66 @@ class CatalogService:
     def get_book(self, db: Session, book_id: int) -> BookResponse:
         return self._book_response(db, self._require_book(db, book_id))
 
-    def create_book(self, db: Session, payload: BookCreate) -> BookResponse:
+    def create_book_with_file(
+        self, db: Session, payload: BookCreate, upload: UploadFile, book_file_service: BookFileService
+    ) -> BookResponse:
+        """Create a book and its mandatory PDF with compensating storage cleanup."""
+        prepared = book_file_service.prepare_upload(upload)
+        storage_key: str | None = None
         book = Book(
             title=payload.title.strip(),
             isbn=payload.isbn.strip(),
             description=payload.description,
-            content=payload.content,
             publication_year=payload.publication_year,
             max_concurrent_borrows=payload.max_concurrent_borrows,
         )
-        book.authors = self._require_authors(db, payload.author_ids)
-        book.categories = self._require_categories(db, payload.category_ids)
-        db.add(book)
-        self._commit(db, "A book with this ISBN already exists")
+        try:
+            book.authors = self._require_authors(db, payload.author_ids)
+            book.categories = self._require_categories(db, payload.category_ids)
+            db.add(book)
+            db.flush()
+            book_file = book_file_service.add_prepared_file(db, book, prepared)
+            storage_key = book_file.storage_key
+            db.commit()
+        except AppError:
+            db.rollback()
+            if storage_key is not None:
+                book_file_service.storage.delete(storage_key)
+            raise
+        except IntegrityError as exc:
+            db.rollback()
+            if storage_key is not None:
+                book_file_service.storage.delete(storage_key)
+            raise AppError(409, "CONFLICT", "A book with this ISBN already exists") from exc
         return self.get_book(db, book.id)
 
-    def create_books_bulk(self, db: Session, payload: BulkBookCreate) -> BulkBookResponse:
-        """Create a whole book batch and its many-to-many links atomically."""
-        self._validate_batch_size(len(payload.books))
-        isbns = [book.isbn.strip() for book in payload.books]
+    def create_books_bulk_with_files(
+        self,
+        db: Session,
+        payloads: list[BulkBookItem],
+        uploads_by_key: dict[str, UploadFile],
+        book_file_service: BookFileService,
+    ) -> BulkBookResponse:
+        """Create an all-or-nothing batch of books and their mandatory PDFs."""
+        self._validate_batch_size(len(payloads))
+        file_keys = [payload.file_key for payload in payloads]
+        if len(file_keys) != len(set(file_keys)):
+            raise AppError(422, "INVALID_FILE_MAPPING", "Each bulk book must use a unique file_key")
+        if set(file_keys) != set(uploads_by_key):
+            raise AppError(422, "INVALID_FILE_MAPPING", "Each book must map to exactly one uploaded PDF")
+
+        isbns = [payload.isbn.strip() for payload in payloads]
         if len(isbns) != len(set(isbns)):
             raise AppError(409, "DUPLICATE_ISBN", "Book ISBNs must be unique within a batch")
         if self.repository.get_books_by_isbns(db, isbns):
             raise AppError(409, "CONFLICT", "A book with one of these ISBNs already exists")
 
-        author_ids = [author_id for book in payload.books for author_id in book.author_ids]
-        category_ids = [category_id for book in payload.books for category_id in book.category_ids]
+        prepared_files = {
+            payload.file_key: book_file_service.prepare_upload(uploads_by_key[payload.file_key])
+            for payload in payloads
+        }
+        author_ids = [author_id for payload in payloads for author_id in payload.author_ids]
+        category_ids = [category_id for payload in payloads for category_id in payload.category_ids]
         authors = {author.id: author for author in self.repository.get_authors(db, list(set(author_ids)))}
         categories = {
             category.id: category
@@ -100,20 +144,35 @@ class CatalogService:
             raise AppError(404, "CATEGORY_NOT_FOUND", "One or more categories were not found")
 
         books: list[Book] = []
-        for item in payload.books:
-            book = Book(
-                title=item.title.strip(),
-                isbn=item.isbn.strip(),
-                description=item.description,
-                content=item.content,
-                publication_year=item.publication_year,
-                max_concurrent_borrows=item.max_concurrent_borrows,
-            )
-            book.authors = [authors[author_id] for author_id in item.author_ids]
-            book.categories = [categories[category_id] for category_id in item.category_ids]
-            db.add(book)
-            books.append(book)
-        self._commit(db, "A book with one of these ISBNs already exists")
+        storage_keys: list[str] = []
+        try:
+            for payload in payloads:
+                book = Book(
+                    title=payload.title.strip(),
+                    isbn=payload.isbn.strip(),
+                    description=payload.description,
+                    publication_year=payload.publication_year,
+                    max_concurrent_borrows=payload.max_concurrent_borrows,
+                )
+                book.authors = [authors[author_id] for author_id in payload.author_ids]
+                book.categories = [categories[category_id] for category_id in payload.category_ids]
+                db.add(book)
+                books.append(book)
+            db.flush()
+            for book, payload in zip(books, payloads, strict=True):
+                book_file = book_file_service.add_prepared_file(db, book, prepared_files[payload.file_key])
+                storage_keys.append(book_file.storage_key)
+            db.commit()
+        except AppError:
+            db.rollback()
+            for storage_key in storage_keys:
+                book_file_service.storage.delete(storage_key)
+            raise
+        except IntegrityError as exc:
+            db.rollback()
+            for storage_key in storage_keys:
+                book_file_service.storage.delete(storage_key)
+            raise AppError(409, "CONFLICT", "A book with one of these ISBNs already exists") from exc
         return BulkBookResponse(
             created=[self.get_book(db, book.id) for book in books], count=len(books)
         )
@@ -123,7 +182,7 @@ class CatalogService:
         updates = payload.model_dump(exclude_unset=True)
         if "max_concurrent_borrows" in updates and updates["max_concurrent_borrows"] < book.current_borrows_count:
             raise AppError(409, "BORROW_CAPACITY_TOO_LOW", "Borrow capacity cannot be below active borrows")
-        for field in ("title", "isbn", "description", "content", "publication_year", "max_concurrent_borrows"):
+        for field in ("title", "isbn", "description", "publication_year", "max_concurrent_borrows"):
             if field in updates:
                 value = updates[field]
                 setattr(book, field, value.strip() if field in {"title", "isbn"} else value)
@@ -216,18 +275,29 @@ class CatalogService:
 
     def _book_response(self, db: Session, book: Book) -> BookResponse:
         average_rating, rating_count = self.repository.rating_stats(db, book.id)
+        active_file = next((book_file for book_file in book.files if book_file.is_active), None)
         return BookResponse(
             id=book.id,
             title=book.title,
             isbn=book.isbn,
             description=book.description,
-            content=book.content,
             publication_year=book.publication_year,
             max_concurrent_borrows=book.max_concurrent_borrows,
             current_borrows_count=book.current_borrows_count,
             available_slots=book.max_concurrent_borrows - book.current_borrows_count,
             content_version=book.content_version,
             is_archived=book.is_archived,
+            has_digital_copy=active_file is not None,
+            digital_file=(
+                BookFileMetadata(
+                    original_filename=active_file.original_filename,
+                    mime_type=active_file.mime_type,
+                    file_size=active_file.file_size,
+                    file_format=active_file.file_format,
+                )
+                if active_file is not None
+                else None
+            ),
             authors=book.authors,
             categories=book.categories,
             average_rating=average_rating,

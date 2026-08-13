@@ -23,6 +23,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.author import Author
     from app.models.book_summary import BookSummary
+    from app.models.book_file import BookFile
     from app.models.borrowing import Borrowing
     from app.models.category import Category
     from app.models.favorite import Favorite
@@ -60,7 +61,6 @@ class Book(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     isbn: Mapped[str] = mapped_column(String(32), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)
     publication_year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     max_concurrent_borrows: Mapped[int] = mapped_column(
         Integer, nullable=False, default=3, server_default="3"
@@ -82,3 +82,4 @@ class Book(Base):
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="book")
     ratings: Mapped[list["Rating"]] = relationship(back_populates="book")
     summaries: Mapped[list["BookSummary"]] = relationship(back_populates="book")
+    files: Mapped[list["BookFile"]] = relationship(back_populates="book", cascade="all, delete-orphan")

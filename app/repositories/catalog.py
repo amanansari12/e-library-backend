@@ -13,7 +13,7 @@ from app.models.reservation import Reservation
 class CatalogRepository:
     """Catalog persistence queries without business policy."""
 
-    _book_options = (selectinload(Book.authors), selectinload(Book.categories))
+    _book_options = (selectinload(Book.authors), selectinload(Book.categories), selectinload(Book.files))
 
     def search_books(
         self,

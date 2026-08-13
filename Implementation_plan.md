@@ -2,7 +2,7 @@
 
 ## Document Status
 
-**Status:** Final implementation plan
+**Status:** Original Phases 1–11 complete; post-Phase-11 Digital Book Storage revision and Multipart Bulk Book Upload enhancement complete. Phase 12 and Phase 13 remain pending.
 
 **Canonical architecture:** `architecture.md`
 
@@ -41,6 +41,8 @@ The final backend must provide:
 - Unit and integration tests
 - Seed data
 - Accurate README documentation
+
+The implemented post-Phase-11 architecture also provides mandatory PDF-backed book creation, local file storage through a storage abstraction, and authorization-controlled PDF streaming.
 
 The implementation must remain:
 
@@ -236,7 +238,7 @@ Do not create empty abstractions simply to match a diagram.
 
 # 5. Approved Database Model
 
-Implement exactly these 12 entities unless `architecture.md` is formally updated:
+The original Phase 2 baseline specified 12 entities. The implemented post-Phase-11 architectural revision formally supersedes that baseline with these 13 current entities:
 
 1. users
 2. books
@@ -244,12 +246,13 @@ Implement exactly these 12 entities unless `architecture.md` is formally updated
 4. categories
 5. book_authors
 6. book_categories
-7. borrowings
-8. reservations
-9. favorites
-10. ratings
-11. book_summaries
-12. refresh_tokens
+7. book_files
+8. borrowings
+9. reservations
+10. favorites
+11. ratings
+12. book_summaries
+13. refresh_tokens
 
 ---
 
@@ -332,7 +335,7 @@ Create the PostgreSQL persistence layer and the initial schema.
 - Create synchronous `Session` factory.
 - Create declarative base.
 - Create database dependency.
-- Define all 12 approved models.
+- Define the approved baseline models; the current implementation additionally includes `BookFile` through the post-Phase-11 migration.
 - Define relationships.
 - Add timestamps.
 - Add foreign keys.
@@ -372,7 +375,6 @@ id
 title
 isbn
 description
-content
 publication_year
 max_concurrent_borrows
 current_borrows_count
@@ -1251,7 +1253,7 @@ Use:
 - Author
 - Description
 - Category
-- Content/excerpt
+- Derived extracted-text excerpt from the active PDF
 
 Treat content as untrusted input.
 
@@ -1324,10 +1326,10 @@ POST /api/v1/books
 ### Batch and transaction behavior
 
 - `CATALOG_BULK_MAX_ITEMS` configures the maximum number of items in each request; the default is 50.
-- Each bulk operation validates its complete batch and commits once.
+- Each bulk operation validates its complete batch and commits once. Book batches use multipart form data: `books` is a JSON metadata array with a unique `file_key` per item, `file_manifest` maps keys to uploaded filenames, and `files` provides exactly one PDF per key.
 - Invalid author/category references, duplicate category conflicts, and ISBN conflicts cause the entire relevant batch to roll back.
 - ISBNs must also be unique within a bulk-book request.
-- No migration is required; the feature reuses the existing catalog tables and constraints.
+- Book-file metadata reuses the post-Phase-11 `BookFile` schema; no migration is required for this multipart enhancement.
 
 ### Relationship and AI behavior
 
@@ -1337,7 +1339,7 @@ Bulk books preserve the existing many-to-many relationships:
 - One author or category may be associated with multiple books.
 - Existing records are referenced by ID; bulk creation does not duplicate authors or categories for shared relationships.
 - Books keep the same normal defaults as single creation, including `content_version = 1`, no active borrows, and not archived.
-- Bulk creation never generates AI summaries automatically; summaries remain an explicit separate operation.
+- Bulk creation never generates AI summaries automatically; summaries remain an explicit separate operation. A failed book batch cleans up stored files and creates no partial catalog records.
 
 ### Roadmap relationship
 
@@ -1351,7 +1353,7 @@ Bulk Catalog Creation
     does not replace, renumber, or alter any official phase
 ```
 
-Verification for this additional feature is part of the current suite: `75 passed`, with `alembic check` reporting no new upgrade operations and revision `20260813_0001 (head)`.
+Verification for this additional feature is part of the current suite; it uses the current `BookFile` migration revision and does not add a migration for multipart bulk uploads.
 
 ---
 
@@ -1450,6 +1452,57 @@ Seed deterministic known values and verify exact aggregates.
 ## Depends on
 
 Phases 6–10.
+
+---
+
+## Post-Phase 11 Architectural Revision: Digital Book Storage and Content Architecture
+
+This revision was added after official Phase 11. It does not renumber, rewrite, or claim to have been part of Phases 1–11; the official roadmap continues with Phase 12.
+
+### Completed status
+
+- Completed baseline: Phases 1 through 11.
+- Completed post-Phase-11 revision: Digital Book Storage and Content Architecture.
+- Completed follow-on enhancement: Multipart Bulk Book Upload.
+- Remaining official roadmap: Phase 12, Cross-Cutting Hardening; then Phase 13, Seed Data, Documentation, and Final Verification.
+
+### Decision
+
+- Remove `books.content` as the digital book source of truth.
+- Store canonical PDF files in controlled local filesystem storage, never PostgreSQL text or BYTEA.
+- Add `Book 1:N BookFile`; one active PDF per book is supported initially.
+- Keep safe metadata, checksum, and derived `extracted_text` in PostgreSQL.
+- Use a small storage abstraction so future object storage can replace local storage without changing the domain service.
+
+`Book` now represents catalog metadata only. The original `books.content` field has been removed; the authoritative digital content is the stored PDF, while `BookFile.extracted_text` is derived data and cannot preserve PDF images, graphs, tables, formatting, or page layout.
+
+### Workflow and access
+
+- `POST /api/v1/books` is ADMIN-only `multipart/form-data` creation and requires book metadata plus a valid PDF. It validates the file, stores it through the storage abstraction, calculates a checksum, extracts derived text, and creates the `Book`/`BookFile` relationship without storing PDF bytes in PostgreSQL.
+- `POST /api/v1/books/{book_id}/file` is ADMIN-only `multipart/form-data` replacement for an unarchived book. It validates/stores the replacement, changes active `BookFile` state, and increments `content_version`.
+- `GET /api/v1/books/{book_id}/file` streams actual PDF binary from local storage to an authenticated user with an active borrowing. It is not a metadata response and it does not expose a filesystem path. Returning the borrowing revokes access; archive retains the asset but blocks streaming.
+- Stored paths are UUID-generated and never exposed. Uploads validate extension, client MIME type, PDF signature/parser readability, non-empty content, and configured size.
+- The existing transactional concurrent-borrowing model remains: `max_concurrent_borrows`, `current_borrows_count`, and `available_slots` are unchanged. No `BookCopy` model is introduced.
+
+### Compatibility and migration
+
+- AI summaries consume available book metadata plus derived PDF text through `BookFile -> extracted_text -> SummaryService -> AI Client`. The existing one-standard-summary cache remains keyed by `(book_id, content_version)`, supports `force_regenerate`, quota protection, rate limiting, safe error mapping, and mocked AI tests. A successful PATCH or PDF replacement increments `content_version`, making prior-version summaries naturally stale.
+- `POST /api/v1/books/bulk` is ADMIN-only and multipart-only. `books` is a JSON metadata array containing unique `file_key` values; `file_manifest` maps each key to an uploaded filename; `files` contains the required PDFs. Mapping is deterministic: `file_key -> file_manifest -> uploaded filename -> BookFile -> Book`. OpenAPI represents each `files` item as `type: string`, `format: binary` for Swagger file-picker controls.
+- Bulk creation validates the complete batch before database writes. Invalid mappings, duplicate file keys, duplicate/existing ISBNs, missing files, invalid PDFs, invalid author/category references, authorization failures, and other validation failures reject the whole request. Database changes roll back and stored files from a failed batch are cleaned up. Every successful item creates one `Book`, one active `BookFile`, and one stored PDF; AI summaries are never generated automatically. Bulk author and category endpoints remain available.
+- Migration `20260814_0002` adds `book_files` and removes `books.content`. Existing short development-only text was not fabricated into invalid digital files; legacy no-file records are archived and their active reservations cancelled, while active borrowings remain returnable.
+- `BOOK_STORAGE_ROOT` and `MAX_BOOK_FILE_SIZE_MB` configure local storage; managed storage is Git-ignored.
+
+### Verified results recorded for this revision
+
+- `pytest -q`: 80 tests passed for the digital-storage and bulk-upload verification.
+- `alembic check`: no new upgrade operations detected.
+- `alembic current`: `20260814_0002 (head)`.
+- Manual single-book verification: **The Metamorphosis**, by Franz Kafka in Classic Literature, was created with a PDF; `has_digital_copy = true` and safe file metadata showed its original filename, `application/pdf`, file size, and `PDF` format.
+- Manual multipart bulk verification: **Pride and Prejudice** and **Test Bulk Book** were created with independently mapped PDFs; each received `has_digital_copy = true`, a corresponding `BookFile`, and PDF metadata.
+- Manual retrieval verification: `GET /api/v1/books/{book_id}/file` returned the stored PDF. Swagger displayed raw binary content as text because of its response renderer, but the response was a downloadable PDF.
+- Manual authorization verification: an active borrowing allowed PDF streaming; returning that borrowing revoked access.
+
+Swagger presentation is distinct from backend behavior: the upload OpenAPI schema uses binary file items, while Swagger may display a streamed PDF as unrecognized text. The API response remains the actual PDF binary.
 
 ---
 
@@ -1945,7 +1998,7 @@ Before writing code:
 
 1. Confirm synchronous execution.
 2. Confirm no Docker is required.
-3. Confirm the 12-table domain model.
+3. Confirm the current 13-entity domain model, including `BookFile` and no `books.content` field.
 4. Confirm a single standard AI summary.
 5. Confirm cache key `(book_id, content_version)`.
 6. Confirm unique AI cache constraint.

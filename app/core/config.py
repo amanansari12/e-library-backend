@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     ai_summary_max_source_chars: int = Field(default=12000, gt=0, le=50000)
     ai_summary_rate_limit: str = "10/hour"
     catalog_bulk_max_items: int = Field(default=50, ge=1, le=500)
+    book_storage_root: str = "storage"
+    max_book_file_size_mb: int = Field(default=100, gt=0, le=1024)
 
     cors_origins: str = "http://localhost:3000"
 
@@ -47,6 +49,11 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         """Return normalized CORS origins from a comma-separated setting."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def max_book_file_size_bytes(self) -> int:
+        """Return the configured upload limit in bytes."""
+        return self.max_book_file_size_mb * 1024 * 1024
 
 
 @lru_cache

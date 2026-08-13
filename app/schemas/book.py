@@ -12,7 +12,6 @@ class BookCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     isbn: str = Field(min_length=1, max_length=32)
     description: str | None = None
-    content: str | None = None
     publication_year: int | None = Field(default=None, ge=0, le=9999)
     max_concurrent_borrows: int = Field(default=3, gt=0)
     author_ids: list[int] = Field(default_factory=list)
@@ -26,11 +25,16 @@ class BookCreate(BaseModel):
         return value
 
 
+class BulkBookItem(BookCreate):
+    """One multipart bulk-book entry with an explicit PDF mapping key."""
+
+    file_key: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class BookUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     isbn: str | None = Field(default=None, min_length=1, max_length=32)
     description: str | None = None
-    content: str | None = None
     publication_year: int | None = Field(default=None, ge=0, le=9999)
     max_concurrent_borrows: int | None = Field(default=None, gt=0)
     author_ids: list[int] | None = None
@@ -44,6 +48,13 @@ class BookUpdate(BaseModel):
         return value
 
 
+class BookFileMetadata(BaseModel):
+    original_filename: str
+    mime_type: str
+    file_size: int
+    file_format: str
+
+
 class BookResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,13 +62,14 @@ class BookResponse(BaseModel):
     title: str
     isbn: str
     description: str | None
-    content: str | None
     publication_year: int | None
     max_concurrent_borrows: int
     current_borrows_count: int
     available_slots: int
     content_version: int
     is_archived: bool
+    has_digital_copy: bool
+    digital_file: BookFileMetadata | None
     authors: list[AuthorResponse]
     categories: list[CategoryResponse]
     average_rating: float | None = None
@@ -69,7 +81,7 @@ class BookResponse(BaseModel):
 class BulkBookCreate(BaseModel):
     """A validated batch of individually valid book requests."""
 
-    books: list[BookCreate] = Field(min_length=1)
+    books: list[BulkBookItem] = Field(min_length=1)
 
 
 class BulkBookResponse(BaseModel):

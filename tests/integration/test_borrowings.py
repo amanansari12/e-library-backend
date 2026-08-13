@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.core.exceptions import AppError
 from app.core.security import create_access_token
 from app.models.book import Book
+from app.models.book_file import BookFile
 from app.models.borrowing import Borrowing
 from app.models.user import User
 from app.schemas.borrowing import BorrowingCreate
@@ -39,6 +40,17 @@ def _create_book(session_factory, *, capacity: int = 3) -> Book:
             title=f"Borrowing Book {identifier}",
             isbn=f"borrow-{identifier}",
             max_concurrent_borrows=capacity,
+        )
+        book.files.append(
+            BookFile(
+                original_filename="fixture.pdf",
+                storage_key=f"fixtures/{identifier}/original.pdf",
+                mime_type="application/pdf",
+                file_size=1,
+                file_format="PDF",
+                checksum="0" * 64,
+                is_active=True,
+            )
         )
         session.add(book)
         session.commit()

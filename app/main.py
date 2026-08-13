@@ -1,8 +1,10 @@
 """FastAPI application entry point."""
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from slowapi.errors import RateLimitExceeded
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.authors import router as authors_router
@@ -45,6 +47,29 @@ def create_app() -> FastAPI:
     application.include_router(ratings_router)
     application.include_router(authors_router)
     application.include_router(categories_router)
+    application.include_router(admin_router)
+
+    def custom_openapi() -> dict:
+        """Normalize the multipart bulk-file schema for Swagger UI file controls."""
+        if application.openapi_schema is not None:
+            return application.openapi_schema
+        schema = get_openapi(
+            title=application.title,
+            version=application.version,
+            routes=application.routes,
+        )
+        request_schema = schema["paths"]["/api/v1/books/bulk"]["post"]["requestBody"]["content"][
+            "multipart/form-data"
+        ]["schema"]
+        component_name = request_schema["$ref"].rsplit("/", 1)[-1]
+        file_items = schema["components"]["schemas"][component_name]["properties"]["files"]["items"]
+        file_items.pop("contentMediaType", None)
+        file_items["type"] = "string"
+        file_items["format"] = "binary"
+        application.openapi_schema = schema
+        return schema
+
+    application.openapi = custom_openapi
     return application
 
 

@@ -4,7 +4,7 @@
 
 This document is the canonical architecture for the E-Library Management System backend.
 
-The system is a student-level, modular monolith built with Python and FastAPI. It provides book management, users, borrowing, searching, reservations, favorites, ratings, admin statistics, and AI-powered book summaries.
+The system is a student-level, modular monolith built with Python and FastAPI. It provides book management, controlled digital-book storage and access, users, borrowing, searching, reservations, favorites, ratings, admin statistics, and AI-powered book summaries.
 
 The architecture intentionally avoids unnecessary enterprise infrastructure. The project should be realistic for one student to implement, test, understand, and defend in an interview.
 
@@ -24,15 +24,25 @@ Service Layer
   v                      v
 Repository Layer       AI Client
   |                      |
-  v                      v
-PostgreSQL         Userfacet AI API
+  +----------------------+\
+  |                      | \
+  v                      v  v
+PostgreSQL      Local Storage  Userfacet AI API
 ```
 
 The backend is a **modular monolith**.
 
+### Current implementation status
+
+Original Phases 1–11 are complete. The post-Phase-11 Digital Book Storage revision and its Multipart Bulk Book Upload enhancement are also complete. The current database revision is `20260814_0002 (head)`.
+
 ### Additional operational enhancement: Bulk Catalog Creation
 
-Bulk catalog endpoints were added separately from the canonical phase roadmap as an admin operational enhancement. `POST /api/v1/authors/bulk`, `POST /api/v1/categories/bulk`, and `POST /api/v1/books/bulk` preserve the existing author/category-to-book many-to-many domain model, use atomic batches, and do not trigger AI summary generation.
+Bulk catalog endpoints were added separately from the canonical phase roadmap as an admin operational enhancement. `POST /api/v1/authors/bulk` and `POST /api/v1/categories/bulk` remain JSON batch endpoints. `POST /api/v1/books/bulk` is multipart-only: a JSON metadata array supplies a unique `file_key` per book, a manifest maps those keys to uploaded filenames, and every PDF is validated and stored through `BookFile` before the batch commits. All three use atomic batches and do not trigger AI summary generation.
+
+### Post-Phase 11 architectural revision: Digital Book Storage
+
+PostgreSQL stores metadata and relationships; server-controlled local filesystem storage holds canonical PDFs. `BookFile` is a one-to-many child of `Book`, although only one file is active per book today. `extracted_text` is derived auxiliary data for AI summaries, never a substitute for the original PDF. The storage abstraction isolates `save`, `exists`, streaming, and deletion for a later object-storage migration.
 
 ---
 
@@ -362,6 +372,7 @@ e-library-backend/
 │   ├── models/
 │   │   ├── user.py
 │   │   ├── book.py
+│   │   ├── book_file.py
 │   │   ├── author.py
 │   │   ├── category.py
 │   │   ├── borrowing.py
@@ -386,7 +397,8 @@ e-library-backend/
 │   │
 │   ├── repositories/
 │   │   ├── user.py
-│   │   ├── book.py
+│   │   ├── catalog.py
+│   │   ├── book_file.py
 │   │   ├── borrowing.py
 │   │   ├── reservation.py
 │   │   ├── favorite.py
@@ -396,7 +408,9 @@ e-library-backend/
 │   │
 │   ├── services/
 │   │   ├── auth.py
-│   │   ├── book.py
+│   │   ├── catalog.py
+│   │   ├── book_file.py
+│   │   ├── text_extraction.py
 │   │   ├── borrowing.py
 │   │   ├── reservation.py
 │   │   ├── favorite.py
@@ -406,6 +420,10 @@ e-library-backend/
 │   │
 │   ├── clients/
 │   │   └── ai_client.py
+│   │
+│   ├── storage/
+│   │   ├── base.py
+│   │   └── local.py
 │   │
 │   ├── dependencies/
 │   │   └── auth.py
@@ -448,7 +466,6 @@ Fields:
 - title
 - isbn
 - description
-- content
 - publication_year
 - max_concurrent_borrows
 - current_borrows_count
@@ -456,6 +473,25 @@ Fields:
 - is_archived
 - created_at
 - updated_at
+
+`books.content` has been removed. `Book` is catalog and domain metadata only; it is not the canonical container for a digital document.
+
+### BookFile
+
+- id
+- book_id
+- original_filename
+- storage_key (internal only)
+- mime_type
+- file_size
+- file_format
+- checksum
+- extracted_text (derived only)
+- is_active
+- created_at
+- updated_at
+
+`storage_key` is an internal, server-controlled reference to the stored asset and is never exposed through book responses. The original PDF remains in configurable local storage and is the canonical digital content. `extracted_text` is derived auxiliary data for AI and possible future search; it does not preserve images, graphs, tables, formatting, or page layout, which remain in the original PDF. A book requires one active PDF before it can be borrowed. Archive operations retain the asset but block file access.
 
 ### Author
 
@@ -566,6 +602,10 @@ Fields:
 - revoked
 - created_at
 
+### Implemented database entities
+
+The current schema contains 13 domain entities/association tables: `users`, `books`, `authors`, `categories`, `book_authors`, `book_categories`, `book_files`, `borrowings`, `reservations`, `favorites`, `ratings`, `book_summaries`, and `refresh_tokens`. `book_files` was introduced by migration `20260814_0002`, which also removed `books.content`.
+
 ---
 
 ## 10. Digital Availability Model
@@ -608,6 +648,13 @@ Important invariants must be protected at the database level where appropriate.
 - CHECK(max_concurrent_borrows > 0)
 - CHECK(current_borrows_count >= 0)
 - CHECK(content_version >= 1)
+
+### Book files
+
+- UNIQUE(storage_key)
+- CHECK(file_size > 0)
+- CHECK(file_format IN ('PDF'))
+- One active file per book through the `uq_active_book_file` partial unique index
 
 ### Favorites
 
@@ -665,6 +712,8 @@ The final business rules are:
 8. Returning a book decrements `current_borrows_count`.
 9. Returning a book may promote the next reservation.
 10. Borrowing and availability updates must occur atomically.
+11. A book must have an active `BookFile` before it can be borrowed.
+12. An active borrowing authorizes `GET /api/v1/books/{book_id}/file`; returning the borrowing changes its status to `RETURNED` and revokes that access.
 
 ---
 
@@ -845,6 +894,8 @@ POST /api/v1/books/{book_id}/summary
   v
 SummaryService
   |
+  +--> Active BookFile extracted_text + book metadata
+  |
   +--> Database cache lookup
   |
   +--> Cache hit --> Return existing summary
@@ -879,7 +930,7 @@ Cache key:
 (book_id, content_version)
 ```
 
-Any `PATCH /books/{id}` increments `content_version`.
+Any `PATCH /books/{id}` increments `content_version`. Replacing the active PDF through `POST /books/{id}/file` also increments it.
 
 This intentionally invalidates the previous summary even if only metadata changed.
 
@@ -997,15 +1048,15 @@ The generated prompt should use available book information such as:
 - Author
 - Description
 - Category
-- Content/excerpt
+- Derived extracted-text excerpt from the active PDF
 
 Use a controlled system/user prompt.
 
 Do not allow arbitrary client-provided instructions to replace the intended summarization task.
 
-Limit content size before sending it upstream.
+Limit derived extracted text before sending it upstream.
 
-Treat book content as untrusted input from a prompt-injection perspective.
+Treat extracted text as untrusted input from a prompt-injection perspective.
 
 ---
 
@@ -1163,10 +1214,24 @@ PATCH /api/v1/users/me
 GET   /api/v1/books
 GET   /api/v1/books/{book_id}
 POST  /api/v1/books
+POST  /api/v1/books/bulk
+POST  /api/v1/books/{book_id}/file
+GET   /api/v1/books/{book_id}/file
 PATCH /api/v1/books/{book_id}
 POST  /api/v1/books/{book_id}/archive
 POST  /api/v1/books/{book_id}/restore
 ```
+
+#### Digital-book operations
+
+| Endpoint | Access | Implemented behavior |
+|---|---|---|
+| `POST /api/v1/books` | ADMIN | `multipart/form-data`: creates one book with a required, validated PDF; storage writes, checksum calculation, derived-text extraction, and `BookFile` creation are coordinated without storing PDF bytes in PostgreSQL. |
+| `POST /api/v1/books/bulk` | ADMIN | Atomic `multipart/form-data` bulk creation. `books` is JSON metadata with unique `file_key` values, `file_manifest` maps each key to one uploaded filename, and `files` supplies the PDFs. Every successful item receives one active `BookFile`; failed batches create no partial records and clean up stored files. AI is not called automatically. |
+| `POST /api/v1/books/{book_id}/file` | ADMIN | Replaces the current PDF for an unarchived book, validates/stores it, updates active `BookFile` state, and increments `content_version`. Existing summaries for the preceding version naturally become stale. |
+| `GET /api/v1/books/{book_id}/file` | Authenticated active borrower | Streams the actual PDF bytes from local storage. It does not return metadata JSON or an absolute path. Archived books and inactive/returned borrowings are denied. |
+
+Upload validation uses the configured size limit, PDF extension/client MIME checks, PDF signature/parser validation, SHA-256 checksum generation, and derived PDF-text extraction. In OpenAPI, each bulk `files` item is `type: string`, `format: binary`, so Swagger presents a file picker. Swagger may display streamed PDF bytes as text with an unrecognized-response message; that is a Swagger binary-rendering limitation, not a change to the actual PDF response.
 
 ### Authors
 
@@ -1233,6 +1298,8 @@ GET  /api/v1/ai/health
 `POST /summary` accepts `force_regenerate`.
 
 It does not accept `summary_type`.
+
+Summary prompts use the active file's extracted text along with book metadata. Replacing a digital file increments `content_version`, so the existing `(book_id, content_version)` cache automatically becomes stale.
 
 ### Admin Statistics
 
@@ -1659,6 +1726,10 @@ Chosen because it is easier to reason about and sufficient for this project.
 
 Chosen because this is an e-library model, not a physical inventory system.
 
+### Local storage for PDFs instead of PostgreSQL document storage
+
+PostgreSQL stores metadata and relational state; local filesystem storage holds large PDF bytes. The storage abstraction avoids coupling domain services to a specific backend, keeps the original PDF canonical, and treats extracted text as derived data. This is a deliberate student-level modular-monolith trade-off; object storage is a future replacement option, not a current implementation.
+
 ---
 
 ## 47. Future Improvements
@@ -1674,7 +1745,7 @@ Future work may include:
 - Advanced recommendations
 - Elasticsearch
 - OAuth/social login
-- File/object storage
+- Object-storage provider implementation
 - Cursor pagination
 - Distributed locking for AI generation
 - More advanced search

@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from fastapi.testclient import TestClient
+from pypdf import PdfWriter
 from sqlalchemy import select
 
 from app.core.security import create_access_token
@@ -52,6 +55,28 @@ def _book_payload(author_id: int, category_id: int) -> dict[str, object]:
     }
 
 
+def _pdf_bytes() -> bytes:
+    stream = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.write(stream)
+    return stream.getvalue()
+
+
+def _create_book(client: TestClient, headers: dict[str, str], author_id: int, category_id: int):
+    payload = _book_payload(author_id, category_id)
+    return client.post(
+        "/api/v1/books",
+        headers=headers,
+        data={
+            **{key: str(value) for key, value in payload.items() if key not in {"author_ids", "category_ids"}},
+            "author_ids": str(author_id),
+            "category_ids": str(category_id),
+        },
+        files={"file": ("parable.pdf", _pdf_bytes(), "application/pdf")},
+    )
+
+
 def test_catalog_mutations_require_admin(client: TestClient, session_factory) -> None:
     regular_user = _create_user(session_factory)
 
@@ -67,11 +92,13 @@ def test_author_category_and_book_crud_with_relationships(client: TestClient, se
     author_id = _create_author(client, headers)
     category_id = _create_category(client, headers)
 
-    create_response = client.post("/api/v1/books", headers=headers, json=_book_payload(author_id, category_id))
+    create_response = _create_book(client, headers, author_id, category_id)
     assert create_response.status_code == 201
     book = create_response.json()
     assert book["available_slots"] == 3
     assert book["content_version"] == 1
+    assert book["has_digital_copy"] is True
+    assert book["digital_file"]["file_format"] == "PDF"
     assert [author["id"] for author in book["authors"]] == [author_id]
     assert [category["id"] for category in book["categories"]] == [category_id]
 
@@ -96,7 +123,7 @@ def test_book_patch_always_increments_content_version(client: TestClient, sessio
     headers = _headers(admin)
     author_id = _create_author(client, headers)
     category_id = _create_category(client, headers)
-    book = client.post("/api/v1/books", headers=headers, json=_book_payload(author_id, category_id)).json()
+    book = _create_book(client, headers, author_id, category_id).json()
 
     first_update = client.patch(f"/api/v1/books/{book['id']}", headers=headers, json={"title": book["title"]})
     second_update = client.patch(
@@ -114,7 +141,7 @@ def test_archive_cancels_active_reservations_and_restore_preserves_book(client: 
     headers = _headers(admin)
     author_id = _create_author(client, headers)
     category_id = _create_category(client, headers)
-    book = client.post("/api/v1/books", headers=headers, json=_book_payload(author_id, category_id)).json()
+    book = _create_book(client, headers, author_id, category_id).json()
 
     with session_factory() as session:
         session.add(Reservation(user_id=admin.id, book_id=book["id"], position=1, status="PENDING"))

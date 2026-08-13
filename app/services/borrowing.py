@@ -9,6 +9,7 @@ from app.core.exceptions import AppError
 from app.models.borrowing import Borrowing
 from app.models.user import User
 from app.repositories.borrowing import BorrowingRepository
+from app.repositories.book_file import BookFileRepository
 from app.schemas.borrowing import BorrowingCreate, BorrowingResponse
 from app.services.reservation import ReservationService
 
@@ -22,9 +23,11 @@ class BorrowingService:
         self,
         repository: BorrowingRepository | None = None,
         reservation_service: ReservationService | None = None,
+        book_file_repository: BookFileRepository | None = None,
     ) -> None:
         self.repository = repository or BorrowingRepository()
         self.reservation_service = reservation_service or ReservationService()
+        self.book_file_repository = book_file_repository or BookFileRepository()
 
     def borrow(self, db: Session, user: User, payload: BorrowingCreate) -> BorrowingResponse:
         """Create a borrowing and consume one concurrent slot atomically."""
@@ -34,6 +37,8 @@ class BorrowingService:
                 raise AppError(404, "BOOK_NOT_FOUND", "Book not found")
             if book.is_archived:
                 raise AppError(409, "BOOK_ARCHIVED", "Archived books cannot be borrowed")
+            if not self.book_file_repository.has_active(db, book.id):
+                raise AppError(409, "DIGITAL_FILE_REQUIRED", "A digital book file is required before borrowing")
             self.reservation_service.reconcile_locked_book(db, book, datetime.now(UTC))
             locked_user = self.repository.lock_user(db, user.id)
             if locked_user is None:

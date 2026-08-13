@@ -22,10 +22,11 @@ def _check_expressions(table_name: str) -> set[str]:
     }
 
 
-def test_metadata_contains_exactly_the_approved_twelve_tables() -> None:
+def test_metadata_contains_the_digital_file_table() -> None:
     assert set(Base.metadata.tables) == {
         "users",
         "books",
+        "book_files",
         "authors",
         "categories",
         "book_authors",
@@ -53,6 +54,8 @@ def test_required_check_constraints_and_absent_columns_are_defined() -> None:
     assert "status IN ('ACTIVE', 'RETURNED')" in _check_expressions("borrowings")
     assert "is_active" not in Base.metadata.tables["users"].columns
     assert "summary_type" not in Base.metadata.tables["book_summaries"].columns
+    assert "content" not in Base.metadata.tables["books"].columns
+    assert "file_size > 0" in _check_expressions("book_files")
 
 
 def test_active_reservation_index_is_postgresql_partial_and_unique() -> None:

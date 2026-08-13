@@ -2,6 +2,7 @@
 
 from app.models.author import Author
 from app.models.book import Book, book_authors, book_categories
+from app.models.book_file import BookFile
 from app.models.book_summary import BookSummary
 from app.models.borrowing import Borrowing
 from app.models.category import Category
@@ -14,6 +15,7 @@ from app.models.user import User
 __all__ = [
     "Author",
     "Book",
+    "BookFile",
     "BookSummary",
     "Borrowing",
     "Category",

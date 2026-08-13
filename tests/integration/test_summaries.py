@@ -56,9 +56,11 @@ class _FakeAIClient:
         self.summary_text = summary_text
         self.generate_calls = 0
         self.fail_with: AIClientError | None = None
+        self.prompts: list[str] = []
 
     def generate_summary(self, prompt: str) -> tuple[str, int | None, str]:
         self.generate_calls += 1
+        self.prompts.append(prompt)
         assert "<book-data>" in prompt
         if self.fail_with is not None:
             raise self.fail_with
@@ -92,7 +94,8 @@ def _book_with_source(session_factory) -> Book:
         stored_book = session.get(Book, book.id)
         assert stored_book is not None
         stored_book.description = "A test description suitable for an AI summary."
-        stored_book.content = "Reference text for this book."
+        stored_file = next(book_file for book_file in stored_book.files if book_file.is_active)
+        stored_file.extracted_text = "Reference text extracted from this book file."
         session.commit()
         session.refresh(stored_book)
         session.expunge(stored_book)
@@ -167,6 +170,7 @@ def test_summary_cache_hit_force_regeneration_and_failure_preservation(session_f
     assert first.summary_text == cached.summary_text == "First valid summary"
     assert regenerated.summary_text == preserved.summary_text == "Regenerated valid summary"
     assert fake_ai.generate_calls == 3
+    assert "Reference text extracted from this book file." in fake_ai.prompts[0]
     assert exc_info.value.code == "AI_PROVIDER_UNAVAILABLE"
 
 
