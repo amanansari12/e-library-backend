@@ -17,7 +17,37 @@ The backend is currently deployed on Railway.
 - **Runtime PDF Storage:** Railway Persistent Volume
 - **Migration Head:** `20260814_0004`
 
+> **Demo Environment Notice:** This live deployment is intended for portfolio/interviewer evaluation. The credentials shown below are demonstration credentials only and must not be reused for a real production deployment.
+
 > The production database and runtime storage are separate from the local development environment.
+
+## Demo Access
+
+### Public Demo User
+
+Username: `alice`  
+Password: `Demo1234`
+
+The same demo password is used for the other seeded demo users:
+
+`bob`, `carol`, `dave`, `erin`
+
+### Demo Administrator
+
+Email: `admin@example.com`  
+Password: `Admin@123`
+
+> **Temporary Demo Credential Disclaimer**
+>
+> The administrator password is currently documented because this deployment is being used as a temporary interviewer/portfolio demonstration environment.
+>
+> This credential is **not intended for production or sensitive use**. Before this application is used for any real deployment, the administrator password will be rotated and this password will be removed from the README.
+>
+> For self-hosted/local deployments, administrators should be created using:
+>
+> ```bash
+> python scripts/create_admin.py
+> ```
 
 ---
 
@@ -270,7 +300,7 @@ Runtime PDF storage must be persistent in production.
 Full reference: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 Local Swagger: http://localhost:8000/docs
 Production Swagger: https://e-library-backend-production.up.railway.app/docs
-OpenAPI JSON: https://e-library-backend-production.up.railway.app/openapi.json is the machine-readable OpenAPI contract.
+**OpenAPI JSON:** https://e-library-backend-production.up.railway.app/openapi.json
 
 ## 13. Running Tests
 
