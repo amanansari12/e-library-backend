@@ -34,7 +34,7 @@ The backend is a **modular monolith**.
 
 ### Current implementation status
 
-Original Phases 1–11 are complete. The post-Phase-11 Digital Book Storage revision and its Multipart Bulk Book Upload enhancement are also complete. The current database revision is `20260814_0002 (head)`.
+Original Phases 1–13 are complete. The post-Phase-11 Digital Book Storage revision, Multipart Bulk Book Upload enhancement, optional Book Reviews, Phase 12 Cross-Cutting Hardening, and post-Phase-12 Reading Progress are also complete. The current database revision is `20260814_0004 (head)`.
 
 ### Additional operational enhancement: Bulk Catalog Creation
 
@@ -375,6 +375,8 @@ e-library-backend/
 │   │       ├── reservations.py
 │   │       ├── favorites.py
 │   │       ├── ratings.py
+│   │       ├── reading_progress.py
+│   │       ├── reviews.py
 │   │       ├── summaries.py
 │   │       ├── admin.py
 │   │       └── health.py
@@ -382,6 +384,7 @@ e-library-backend/
 │   ├── core/
 │   │   ├── config.py
 │   │   ├── security.py
+│   │   ├── rate_limit.py
 │   │   └── exceptions.py
 │   │
 │   ├── db/
@@ -398,6 +401,8 @@ e-library-backend/
 │   │   ├── reservation.py
 │   │   ├── favorite.py
 │   │   ├── rating.py
+│   │   ├── reading_progress.py
+│   │   ├── book_review.py
 │   │   ├── book_summary.py
 │   │   └── refresh_token.py
 │   │
@@ -411,6 +416,8 @@ e-library-backend/
 │   │   ├── reservation.py
 │   │   ├── favorite.py
 │   │   ├── rating.py
+│   │   ├── reading_progress.py
+│   │   ├── review.py
 │   │   ├── summary.py
 │   │   └── admin.py
 │   │
@@ -422,6 +429,8 @@ e-library-backend/
 │   │   ├── reservation.py
 │   │   ├── favorite.py
 │   │   ├── rating.py
+│   │   ├── reading_progress.py
+│   │   ├── review.py
 │   │   ├── summary.py
 │   │   └── statistics.py
 │   │
@@ -434,6 +443,8 @@ e-library-backend/
 │   │   ├── reservation.py
 │   │   ├── favorite.py
 │   │   ├── rating.py
+│   │   ├── reading_progress.py
+│   │   ├── review.py
 │   │   ├── summary.py
 │   │   └── admin.py
 │   │
@@ -451,9 +462,32 @@ e-library-backend/
 │       ├── request_id.py
 │       └── cors.py
 │
+├── scripts/
+│   └── seed.py
+│
 └── tests/
+    ├── test_config.py
+    ├── test_health.py
     ├── unit/
+    │   ├── test_auth_dependencies.py
+    │   ├── test_openapi.py
+    │   └── test_schema.py
     └── integration/
+        ├── conftest.py
+        ├── test_admin_statistics.py
+        ├── test_auth.py
+        ├── test_book_files.py
+        ├── test_borrowings.py
+        ├── test_bulk_catalog.py
+        ├── test_catalog.py
+        ├── test_favorites.py
+        ├── test_hardening.py
+        ├── test_ratings.py
+        ├── test_reading_progress.py
+        ├── test_reservations.py
+        ├── test_reviews.py
+        ├── test_search.py
+        └── test_summaries.py
 ```
 
 Only create files that are actually required. The structure is guidance, not a requirement to create empty boilerplate.

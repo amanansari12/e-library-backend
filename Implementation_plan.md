@@ -2,7 +2,7 @@
 
 ## Document Status
 
-**Status:** Original Phases 1–11, Phase 12 Cross-Cutting Hardening, post-Phase-11 Digital Book Storage, Multipart Bulk Book Upload, and optional Book Reviews are complete. Post-Phase-12 Reading Progress is complete. Phase 13 remains pending.
+**Status:** Original Phases 1–11, Phase 12 Cross-Cutting Hardening, post-Phase-11 Digital Book Storage, Multipart Bulk Book Upload, optional Book Reviews, and post-Phase-12 Reading Progress are complete. Phase 13 (Seed Data, Documentation, and Final Verification) is COMPLETE. Current database revision: `20260814_0004 (head)`. Final automated test suite: 107 passed.
 
 **Canonical architecture:** `architecture.md`
 
@@ -1619,7 +1619,7 @@ This focused feature follows completed Phase 12 and does not renumber official p
 
 - Tests cover ACTIVE-vs-returned-vs-reservation eligibility, numeric validation, owner-only reads, idempotent upsert, unique-concurrency behavior, private Continue Reading ordering, stale-version detection, borrowing-counter independence, database metadata, and OpenAPI contracts.
 - Verification: `pytest -q` passed with 107 tests; `alembic upgrade head` applied `20260814_0004`; `alembic check` found no new upgrade operations; `alembic current` reported `20260814_0004 (head)`.
-- Phase 13 remains pending. No seed-data or final-project work begins here.
+- Phase 13 seed data, documentation, and final verification is COMPLETE.
 
 ---
 
@@ -2067,7 +2067,7 @@ Before writing code:
 
 1. Confirm synchronous execution.
 2. Confirm no Docker is required.
-3. Confirm the current 14-entity domain model, including `BookFile`, `BookReview`, and no `books.content` field.
+3. Confirm the current 15-entity domain model, including `BookFile`, `BookReview`, `ReadingProgress`, and no `books.content` field.
 4. Confirm a single standard AI summary.
 5. Confirm cache key `(book_id, content_version)`.
 6. Confirm unique AI cache constraint.
