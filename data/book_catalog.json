@@ -1,0 +1,305 @@
+[
+  {
+    "title": "Pride and Prejudice",
+    "author": "Jane Austen",
+    "categories": [
+      "Classic Literature",
+      "Romance"
+    ],
+    "publication_year": 1813,
+    "filename": "pride-and-prejudice.pdf",
+    "gutenberg_id": 1342,
+    "sha256": "0e8b3b5a2455f01d14e003bf1755a3f9f736dfab5d1c30ce17da3b093d3b13c7",
+    "id": "pride-and-prejudice",
+    "file": "books/pride-and-prejudice.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "Frankenstein; or, The Modern Prometheus",
+    "author": "Mary Shelley",
+    "categories": [
+      "Classic Literature",
+      "Science Fiction",
+      "Horror"
+    ],
+    "publication_year": 1818,
+    "filename": "frankenstein.pdf",
+    "gutenberg_id": 84,
+    "sha256": "e4ec8ff74f4408fb14c89006e846458390b81a7813ec6a07dc0b6faf4aca7073",
+    "id": "frankenstein",
+    "file": "books/frankenstein.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "The Time Machine",
+    "author": "H. G. Wells",
+    "categories": [
+      "Science Fiction",
+      "Adventure"
+    ],
+    "publication_year": 1895,
+    "filename": "the-time-machine.pdf",
+    "gutenberg_id": 35,
+    "sha256": "07cf0668461dc6dc2b7077f4dedaddc8ab0e26282b105aaa754e7aa2ddd61d67",
+    "id": "the-time-machine",
+    "file": "books/the-time-machine.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "The War of the Worlds",
+    "author": "H. G. Wells",
+    "categories": [
+      "Science Fiction",
+      "Horror"
+    ],
+    "publication_year": 1898,
+    "filename": "the-war-of-the-worlds.pdf",
+    "gutenberg_id": 36,
+    "sha256": "f775f5f72a931a0c8a13c324ff1683491b9d68da53419c9eac89850f40025885",
+    "id": "the-war-of-the-worlds",
+    "file": "books/the-war-of-the-worlds.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "The Adventures of Sherlock Holmes",
+    "author": "Arthur Conan Doyle",
+    "categories": [
+      "Mystery & Detective",
+      "Classic Literature"
+    ],
+    "publication_year": 1892,
+    "filename": "adventures-of-sherlock-holmes.pdf",
+    "gutenberg_id": 1661,
+    "sha256": "fdcd0f5cc4965a05c5f4729547a2ab36cf07168a457ea6f0eb6a61a21df8a6ee",
+    "id": "adventures-of-sherlock-holmes",
+    "file": "books/adventures-of-sherlock-holmes.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "Dracula",
+    "author": "Bram Stoker",
+    "categories": [
+      "Gothic Fiction",
+      "Horror"
+    ],
+    "publication_year": 1897,
+    "filename": "dracula.pdf",
+    "gutenberg_id": 345,
+    "sha256": "7e7b6c3fa00b10e2a7c6047a038aae8d7bc4b4c7d7fa3ea971ed2ee92b7436f9",
+    "id": "dracula",
+    "file": "books/dracula.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "The Picture of Dorian Gray",
+    "author": "Oscar Wilde",
+    "categories": [
+      "Gothic Fiction",
+      "Drama"
+    ],
+    "publication_year": 1890,
+    "filename": "picture-of-dorian-gray.pdf",
+    "gutenberg_id": 174,
+    "sha256": "63c954b0f238a1f9c0ca63c050361f2a219d39db3f71c4d17a012d35eadc1b0c",
+    "id": "picture-of-dorian-gray",
+    "file": "books/picture-of-dorian-gray.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "The Wonderful Wizard of Oz",
+    "author": "L. Frank Baum",
+    "categories": [
+      "Children's Literature",
+      "Fantasy"
+    ],
+    "publication_year": 1900,
+    "filename": "wonderful-wizard-of-oz.pdf",
+    "gutenberg_id": 43936,
+    "sha256": "725f078714149cab7bbe802e3c4dc20efb6f317db4a30d26f1998d320febe377",
+    "id": "wonderful-wizard-of-oz",
+    "file": "books/wonderful-wizard-of-oz.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "The Adventures of Tom Sawyer",
+    "author": "Mark Twain",
+    "categories": [
+      "Classic Literature",
+      "Adventure",
+      "Children's Literature"
+    ],
+    "publication_year": 1876,
+    "filename": "adventures-of-tom-sawyer.pdf",
+    "gutenberg_id": 74,
+    "sha256": "69524906d238004592d3d9346a2dd250675b00ad3bb65d0490408b32a08f51ed",
+    "id": "adventures-of-tom-sawyer",
+    "file": "books/adventures-of-tom-sawyer.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "Adventures of Huckleberry Finn",
+    "author": "Mark Twain",
+    "categories": [
+      "Classic Literature",
+      "Adventure"
+    ],
+    "publication_year": 1884,
+    "filename": "adventures-of-huckleberry-finn.pdf",
+    "gutenberg_id": 76,
+    "sha256": "e52b04a5177f6ee807204eb6e02bfe877a45751785f7c7a2ee237d43fe2b340f",
+    "id": "adventures-of-huckleberry-finn",
+    "file": "books/adventures-of-huckleberry-finn.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "Great Expectations",
+    "author": "Charles Dickens",
+    "categories": [
+      "Classic Literature",
+      "Historical Fiction"
+    ],
+    "publication_year": 1861,
+    "filename": "great-expectations.pdf",
+    "gutenberg_id": 1400,
+    "sha256": "930a2759dc4c8f8121dde9c70e83e8ae04ffb6348895b729dd4e91422315a265",
+    "id": "great-expectations",
+    "file": "books/great-expectations.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "A Tale of Two Cities",
+    "author": "Charles Dickens",
+    "categories": [
+      "Classic Literature",
+      "Historical Fiction"
+    ],
+    "publication_year": 1859,
+    "filename": "a-tale-of-two-cities.pdf",
+    "gutenberg_id": 98,
+    "sha256": "d4a288969424bdb01e492499c74488bf27aaaa7628041a2a71ac866e93ccdd6b",
+    "id": "a-tale-of-two-cities",
+    "file": "books/a-tale-of-two-cities.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "Oliver Twist",
+    "author": "Charles Dickens",
+    "categories": [
+      "Classic Literature",
+      "Drama"
+    ],
+    "publication_year": 1838,
+    "filename": "oliver-twist.pdf",
+    "gutenberg_id": 730,
+    "sha256": "ccd8228268296c435d49585316e64c21bb3d64d3c5e24a2047dba61784374b24",
+    "id": "oliver-twist",
+    "file": "books/oliver-twist.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "A Christmas Carol",
+    "author": "Charles Dickens",
+    "categories": [
+      "Classic Literature",
+      "Fantasy"
+    ],
+    "publication_year": 1843,
+    "filename": "a-christmas-carol.pdf",
+    "gutenberg_id": 46,
+    "sha256": "a56ae778b171465f4cd6daf92fbc87c4ae5d2aaf0717c20038849e986addc00d",
+    "id": "a-christmas-carol",
+    "file": "books/a-christmas-carol.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "The Secret Garden",
+    "author": "Frances Hodgson Burnett",
+    "categories": [
+      "Children's Literature",
+      "Classic Literature"
+    ],
+    "publication_year": 1911,
+    "filename": "secret-garden.pdf",
+    "gutenberg_id": 113,
+    "sha256": "1564779eb0969f48d5ec28c4ad0d74b216f2df32f41031d08579d00276deb4b5",
+    "id": "secret-garden",
+    "file": "books/secret-garden.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "Little Women",
+    "author": "Louisa May Alcott",
+    "categories": [
+      "Classic Literature",
+      "Drama"
+    ],
+    "publication_year": 1868,
+    "filename": "little-women.pdf",
+    "gutenberg_id": 514,
+    "sha256": "2f8fc51665470dc28cd0f1e26b561fcbe4bcc2a07d69b56138460bf4c8260b97",
+    "id": "little-women",
+    "file": "books/little-women.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "The Count of Monte Cristo",
+    "author": "Alexandre Dumas",
+    "categories": [
+      "Historical Fiction",
+      "Adventure"
+    ],
+    "publication_year": 1844,
+    "filename": "count-of-monte-cristo.pdf",
+    "gutenberg_id": 1184,
+    "sha256": "2c4ea9e2a4aff0391f5185b66e4a7d69c41be5cb0ce0f3859663939be2c1c6b0",
+    "id": "count-of-monte-cristo",
+    "file": "books/count-of-monte-cristo.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "Treasure Island",
+    "author": "Robert Louis Stevenson",
+    "categories": [
+      "Adventure",
+      "Children's Literature"
+    ],
+    "publication_year": 1883,
+    "filename": "treasure-island.pdf",
+    "gutenberg_id": 120,
+    "sha256": "cbf5543ad22e0961124dc380d67b120b06d0de821d0536d2ae236f8c86f00f0a",
+    "id": "treasure-island",
+    "file": "books/treasure-island.pdf",
+    "seed_demo": true
+  },
+  {
+    "title": "Jane Eyre",
+    "author": "Charlotte Brontë",
+    "categories": [
+      "Classic Literature",
+      "Romance",
+      "Gothic Fiction"
+    ],
+    "publication_year": 1847,
+    "filename": "jane-eyre.pdf",
+    "gutenberg_id": 1260,
+    "sha256": "e63db7d2b881695b6a028f46402d15a1d9cfa79ee18dd4e50c2cb8bffe7f49b5",
+    "id": "jane-eyre",
+    "file": "books/jane-eyre.pdf",
+    "seed_demo": false
+  },
+  {
+    "title": "Moby-Dick; or, The Whale",
+    "author": "Herman Melville",
+    "categories": [
+      "Classic Literature",
+      "Adventure"
+    ],
+    "publication_year": 1851,
+    "filename": "moby-dick.pdf",
+    "gutenberg_id": 2701,
+    "sha256": "1fd63c19704811ee26a1bfd7c5127d51c3e37fb54d61b3ba615846446b24e240",
+    "id": "moby-dick",
+    "file": "books/moby-dick.pdf",
+    "seed_demo": true
+  }
+]

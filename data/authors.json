@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Jane Austen",
+    "biography": "English novelist known for her social commentary in novels including Pride and Prejudice.",
+    "birth_year": 1775,
+    "death_year": 1817
+  },
+  {
+    "name": "Mary Shelley",
+    "biography": "English novelist who wrote the Gothic novel Frankenstein.",
+    "birth_year": 1797,
+    "death_year": 1851
+  },
+  {
+    "name": "H. G. Wells",
+    "biography": "English writer. Prolific in many genres, he wrote dozens of novels, short stories, and works of social commentary.",
+    "birth_year": 1866,
+    "death_year": 1946
+  },
+  {
+    "name": "Arthur Conan Doyle",
+    "biography": "British writer and physician, most noted for creating the fictional detective Sherlock Holmes.",
+    "birth_year": 1859,
+    "death_year": 1930
+  },
+  {
+    "name": "Bram Stoker",
+    "biography": "Irish author, best known today for his 1897 Gothic horror novel Dracula.",
+    "birth_year": 1847,
+    "death_year": 1912
+  },
+  {
+    "name": "Oscar Wilde",
+    "biography": "Irish poet and playwright. After writing in different forms throughout the 1880s, he became one of London's most popular playwrights in the early 1890s.",
+    "birth_year": 1854,
+    "death_year": 1900
+  },
+  {
+    "name": "L. Frank Baum",
+    "biography": "American author chiefly known for his children's books, particularly The Wonderful Wizard of Oz.",
+    "birth_year": 1856,
+    "death_year": 1919
+  },
+  {
+    "name": "Mark Twain",
+    "biography": "American writer, humorist, entrepreneur, publisher, and lecturer.",
+    "birth_year": 1835,
+    "death_year": 1910
+  },
+  {
+    "name": "Charles Dickens",
+    "biography": "English writer and social critic. He created some of the world's best-known fictional characters.",
+    "birth_year": 1812,
+    "death_year": 1870
+  },
+  {
+    "name": "Frances Hodgson Burnett",
+    "biography": "British-American novelist and playwright. She is best known for the three children's novels Little Lord Fauntleroy, A Little Princess, and The Secret Garden.",
+    "birth_year": 1849,
+    "death_year": 1924
+  },
+  {
+    "name": "Louisa May Alcott",
+    "biography": "American novelist and poet best known as the author of the novel Little Women.",
+    "birth_year": 1832,
+    "death_year": 1888
+  },
+  {
+    "name": "Alexandre Dumas",
+    "biography": "French writer. His works have been translated into many languages, and he is one of the most widely read French authors.",
+    "birth_year": 1802,
+    "death_year": 1870
+  },
+  {
+    "name": "Robert Louis Stevenson",
+    "biography": "Scottish novelist and travel writer, most noted for Treasure Island, Kidnapped, and Strange Case of Dr Jekyll and Mr Hyde.",
+    "birth_year": 1850,
+    "death_year": 1894
+  },
+  {
+    "name": "Charlotte Brontë",
+    "biography": "English novelist and poet, the eldest of the three Brontë sisters who survived into adulthood and whose novels became classics of English literature.",
+    "birth_year": 1816,
+    "death_year": 1855
+  },
+  {
+    "name": "Herman Melville",
+    "biography": "American novelist, short story writer, and poet of the American Renaissance period.",
+    "birth_year": 1819,
+    "death_year": 1891
+  }
+]

@@ -16,6 +16,8 @@ from app.main import app
 @pytest.fixture(scope="session")
 def test_engine():
     settings = get_settings()
+    if not settings.test_database_url:
+        raise RuntimeError("TEST_DATABASE_URL is required for running tests")
     if settings.test_database_url == settings.database_url:
         raise RuntimeError("TEST_DATABASE_URL must be different from DATABASE_URL")
 

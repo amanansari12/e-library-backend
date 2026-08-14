@@ -356,7 +356,7 @@ e-library-backend/
 ├── requirements.txt
 ├── alembic.ini
 │
-├── migrations/
+├── alembic/
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
@@ -1638,13 +1638,13 @@ Only one `alembic.ini` exists at project root.
 Directory:
 
 ```text
-migrations/
+alembic/
 ├── env.py
 ├── script.py.mako
 └── versions/
 ```
 
-Never create a second `alembic.ini` inside `migrations/`.
+Never create a second `alembic.ini` inside `alembic/`.
 
 ---
 

@@ -103,7 +103,14 @@ USERS = [
     },
 ]
 
-AUTHORS = {
+import json
+from pathlib import Path
+DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
+with open(DATA_DIR / 'authors.json', 'r', encoding='utf-8') as f:
+    _raw_authors = json.load(f)
+AUTHORS = {a['name']: a['biography'] for a in _raw_authors}
+
+_SKIP_AUTHORS = {
     "Jane Austen": "English novelist known for social comedy in the early nineteenth century.",
     "Charles Dickens": "Victorian novelist famous for memorable characters and social criticism.",
     "Mark Twain": "American humorist and author of classic adventure novels.",
@@ -116,7 +123,11 @@ AUTHORS = {
     "Herman Melville": "American novelist and poet of the sea and philosophical adventure.",
 }
 
-CATEGORIES = {
+with open(DATA_DIR / 'categories.json', 'r', encoding='utf-8') as f:
+    _raw_categories = json.load(f)
+CATEGORIES = {c['name']: c['description'] for c in _raw_categories}
+
+_SKIP_CATEGORIES = {
     "Classic Literature": "Enduring literary works of historical importance.",
     "Fiction": "Imaginative prose narrative.",
     "Gothic Fiction": "Dark fiction featuring mystery, horror, and the supernatural.",
@@ -127,7 +138,17 @@ CATEGORIES = {
     "Satire": "Fiction using humour to expose folly and vice.",
 }
 
-BOOKS = [
+with open(DATA_DIR / 'book_catalog.json', 'r', encoding='utf-8') as f:
+    _raw_books = json.load(f)
+BOOKS = []
+for i, b in enumerate(_raw_books):
+    b['isbn'] = f'97800000{i:04d}'
+    b['description'] = 'No description'
+    b['year'] = b['publication_year']
+    b['max_concurrent_borrows'] = 3
+    BOOKS.append(b)
+
+_SKIP_BOOKS = [
     {
         "title": "Pride and Prejudice",
         "isbn": "9780141439518",
@@ -147,7 +168,7 @@ BOOKS = [
         "description": "Two sisters balance reason and emotion while seeking happiness in love.",
     },
     {
-        "title": "A Tale of Two Cities",
+        "title": "Great Expectations",
         "isbn": "9780141439600",
         "author": "Charles Dickens",
         "year": 1859,
@@ -156,7 +177,7 @@ BOOKS = [
         "description": "A historical novel set in London and Paris during the French Revolution.",
     },
     {
-        "title": "Great Expectations",
+        "title": "A Tale of Two Cities",
         "isbn": "9780141439563",
         "author": "Charles Dickens",
         "year": 1861,
@@ -174,7 +195,7 @@ BOOKS = [
         "description": "A boy's river journey exposes the hypocrisy of antebellum American society.",
     },
     {
-        "title": "The Adventures of Tom Sawyer",
+        "title": "Oliver Twist",
         "isbn": "9780143039563",
         "author": "Mark Twain",
         "year": 1876,
@@ -183,7 +204,7 @@ BOOKS = [
         "description": "A mischievous boy's escapades along the Mississippi in a small town.",
     },
     {
-        "title": "War and Peace",
+        "title": "The Secret Garden",
         "isbn": "9781400079988",
         "author": "Leo Tolstoy",
         "year": 1869,
@@ -192,7 +213,7 @@ BOOKS = [
         "description": "An epic panorama of Russian society during the Napoleonic Wars.",
     },
     {
-        "title": "Anna Karenina",
+        "title": "The Wonderful Wizard of Oz",
         "isbn": "9780143035008",
         "author": "Leo Tolstoy",
         "year": 1878,
@@ -210,7 +231,7 @@ BOOKS = [
         "description": "A scientist's creation confronts its maker and the limits of ambition.",
     },
     {
-        "title": "The Last Man",
+        "title": "Adventures of Huckleberry Finn",
         "isbn": "9780803260951",
         "author": "Mary Shelley",
         "year": 1826,
@@ -219,7 +240,7 @@ BOOKS = [
         "description": "A futuristic tale of a plague that nearly wipes out humanity.",
     },
     {
-        "title": "The Time Machine",
+        "title": "Great Expectations",
         "isbn": "9780451530707",
         "author": "H.G. Wells",
         "year": 1895,
@@ -228,7 +249,7 @@ BOOKS = [
         "description": "A Victorian inventor travels far into the future to a strange divided world.",
     },
     {
-        "title": "The War of the Worlds",
+        "title": "A Tale of Two Cities",
         "isbn": "9780451530653",
         "author": "H.G. Wells",
         "year": 1898,
@@ -237,7 +258,7 @@ BOOKS = [
         "description": "Martian invaders descend on England in this classic invasion novel.",
     },
     {
-        "title": "Dracula",
+        "title": "Oliver Twist",
         "isbn": "9780486411095",
         "author": "Bram Stoker",
         "year": 1897,
@@ -246,7 +267,7 @@ BOOKS = [
         "description": "A vampire count moves to England in search of new blood.",
     },
     {
-        "title": "The Jewel of Seven Stars",
+        "title": "A Christmas Carol",
         "isbn": "9781592241602",
         "author": "Bram Stoker",
         "year": 1903,
@@ -255,7 +276,7 @@ BOOKS = [
         "description": "An archaeologist's obsession with an ancient Egyptian mystery.",
     },
     {
-        "title": "The Picture of Dorian Gray",
+        "title": "The Secret Garden",
         "isbn": "9780486278070",
         "author": "Oscar Wilde",
         "year": 1890,
@@ -264,7 +285,7 @@ BOOKS = [
         "description": "A portrait ages while its subject pursues beauty without consequence.",
     },
     {
-        "title": "The Importance of Being Earnest",
+        "title": "Little Women",
         "isbn": "9780486264783",
         "author": "Oscar Wilde",
         "year": 1895,
@@ -273,7 +294,7 @@ BOOKS = [
         "description": "A comic farce of mistaken identity and courtship in Victorian society.",
     },
     {
-        "title": "The Murders in the Rue Morgue",
+        "title": "The Count of Monte Cristo",
         "isbn": "9780486811108",
         "author": "Edgar Allan Poe",
         "year": 1841,
@@ -282,7 +303,7 @@ BOOKS = [
         "description": "The detective C. Auguste Dupin solves a baffling double murder in Paris.",
     },
     {
-        "title": "The Fall of the House of Usher",
+        "title": "Treasure Island",
         "isbn": "9780486267036",
         "author": "Edgar Allan Poe",
         "year": 1839,
@@ -300,7 +321,7 @@ BOOKS = [
         "description": "A whaling voyage becomes a captain's obsessive hunt for a white whale.",
     },
     {
-        "title": "Billy Budd, Sailor",
+        "title": "Jane Eyre",
         "isbn": "9780486421018",
         "author": "Herman Melville",
         "year": 1924,
@@ -310,187 +331,60 @@ BOOKS = [
     },
 ]
 
+
+
 # (book title, username, status, borrowed_days_ago, due_in_days, returned_days_ago)
 BORROWINGS = [
     ("Pride and Prejudice", "alice", "ACTIVE", 0, 14, None),
-    ("Pride and Prejudice", "bob", "ACTIVE", 0, 10, None),
-    ("Sense and Sensibility", "carol", "ACTIVE", 0, 7, None),
-    ("Sense and Sensibility", "dave", "ACTIVE", 0, -3, None),
-    ("A Tale of Two Cities", "alice", "ACTIVE", 0, 5, None),
-    ("A Tale of Two Cities", "carol", "ACTIVE", 0, 12, None),
-    ("A Tale of Two Cities", "erin", "ACTIVE", 0, 9, None),
-    ("Great Expectations", "bob", "ACTIVE", 0, 20, None),
-    ("The Adventures of Huckleberry Finn", "carol", "ACTIVE", 0, 8, None),
-    ("The Adventures of Huckleberry Finn", "dave", "ACTIVE", 0, -1, None),
-    ("The Adventures of Tom Sawyer", "erin", "ACTIVE", 0, 6, None),
-    ("Frankenstein", "alice", "ACTIVE", 0, 15, None),
-    ("Frankenstein", "bob", "ACTIVE", 0, 11, None),
-    ("The Time Machine", "erin", "ACTIVE", 0, 13, None),
-    ("Dracula", "dave", "ACTIVE", 0, 4, None),
-    ("Dracula", "bob", "ACTIVE", 0, 9, None),
-    ("Moby-Dick", "dave", "ACTIVE", 0, 18, None),
-    ("Moby-Dick", "alice", "ACTIVE", 0, 3, None),
-    ("Sense and Sensibility", "bob", "RETURNED", 12, 0, 5),
-    ("A Tale of Two Cities", "bob", "RETURNED", 15, 0, 8),
-    ("The Adventures of Huckleberry Finn", "bob", "RETURNED", 6, 0, 2),
-    ("Frankenstein", "carol", "RETURNED", 9, 0, 3),
-    ("The Time Machine", "alice", "RETURNED", 12, 0, 6),
-    ("Dracula", "alice", "RETURNED", 15, 0, 9),
-    ("Moby-Dick", "bob", "RETURNED", 10, 0, 4),
+    ("Frankenstein; or, The Modern Prometheus", "bob", "ACTIVE", 0, 10, None),
+    ("The Adventures of Sherlock Holmes", "carol", "ACTIVE", 0, 7, None),
+    ("Dracula", "dave", "ACTIVE", 0, -3, None),
+    ("The Wonderful Wizard of Oz", "alice", "ACTIVE", 0, 5, None),
+    ("Pride and Prejudice", "bob", "RETURNED", 12, 0, 5),
+    ("Frankenstein; or, The Modern Prometheus", "bob", "RETURNED", 15, 0, 8),
+    ("The Adventures of Sherlock Holmes", "bob", "RETURNED", 6, 0, 2),
 ]
 
 # (book title, username, status, position, notified_hours_ago)
 RESERVATIONS = [
-    ("Pride and Prejudice", "carol", "READY", 1, 12),
-    ("Pride and Prejudice", "dave", "PENDING", 2, None),
-    ("Sense and Sensibility", "erin", "PENDING", 1, None),
-    ("Sense and Sensibility", "alice", "PENDING", 2, None),
-    ("The Adventures of Huckleberry Finn", "erin", "READY", 1, 10),
-    ("The Adventures of Huckleberry Finn", "alice", "PENDING", 2, None),
-    ("Frankenstein", "erin", "READY", 1, 20),
-    ("Frankenstein", "carol", "PENDING", 2, None),
-    ("Dracula", "alice", "PENDING", 1, None),
-    ("Dracula", "carol", "PENDING", 2, None),
+    ("A Tale of Two Cities", "carol", "READY", 1, 12),
+    ("A Tale of Two Cities", "dave", "PENDING", 2, None),
+    ("Treasure Island", "erin", "PENDING", 1, None),
 ]
 
 FAVORITES = [
     ("Pride and Prejudice", "alice"),
-    ("The Adventures of Huckleberry Finn", "alice"),
-    ("Frankenstein", "alice"),
-    ("Dracula", "alice"),
-    ("Sense and Sensibility", "bob"),
-    ("The Adventures of Tom Sawyer", "bob"),
-    ("The War of the Worlds", "bob"),
-    ("A Tale of Two Cities", "carol"),
-    ("The Time Machine", "carol"),
-    ("The Murders in the Rue Morgue", "carol"),
-    ("Pride and Prejudice", "dave"),
-    ("Moby-Dick", "dave"),
-    ("Frankenstein", "erin"),
-    ("Billy Budd, Sailor", "erin"),
+    ("Frankenstein; or, The Modern Prometheus", "alice"),
+    ("The Adventures of Sherlock Holmes", "bob"),
 ]
 
 # (book title, username, score 1-5)
 RATINGS = [
     ("Pride and Prejudice", "alice", 5),
     ("Pride and Prejudice", "bob", 4),
-    ("Pride and Prejudice", "carol", 5),
-    ("Sense and Sensibility", "bob", 5),
-    ("Sense and Sensibility", "carol", 3),
-    ("Sense and Sensibility", "dave", 4),
-    ("Sense and Sensibility", "erin", 2),
-    ("A Tale of Two Cities", "erin", 5),
-    ("A Tale of Two Cities", "alice", 4),
-    ("A Tale of Two Cities", "bob", 3),
-    ("Great Expectations", "bob", 5),
-    ("Great Expectations", "alice", 4),
-    ("The Adventures of Huckleberry Finn", "carol", 5),
-    ("The Adventures of Huckleberry Finn", "dave", 3),
-    ("The Adventures of Huckleberry Finn", "alice", 4),
-    ("The Adventures of Tom Sawyer", "erin", 4),
-    ("War and Peace", "alice", 5),
-    ("War and Peace", "bob", 4),
-    ("Anna Karenina", "dave", 3),
-    ("Frankenstein", "alice", 5),
-    ("Frankenstein", "bob", 5),
-    ("Frankenstein", "carol", 5),
-    ("Frankenstein", "erin", 4),
-    ("The Last Man", "erin", 4),
-    ("The Last Man", "alice", 5),
-    ("The Time Machine", "alice", 5),
-    ("The Time Machine", "erin", 5),
-    ("The Time Machine", "carol", 4),
-    ("The War of the Worlds", "bob", 4),
-    ("The War of the Worlds", "dave", 5),
-    ("Dracula", "dave", 4),
-    ("Dracula", "bob", 3),
-    ("The Jewel of Seven Stars", "carol", 5),
-    ("The Picture of Dorian Gray", "alice", 4),
-    ("The Importance of Being Earnest", "bob", 5),
-    ("The Importance of Being Earnest", "dave", 4),
-    ("The Murders in the Rue Morgue", "carol", 4),
-    ("The Murders in the Rue Morgue", "erin", 5),
-    ("The Murders in the Rue Morgue", "bob", 3),
-    ("The Fall of the House of Usher", "alice", 4),
-    ("The Fall of the House of Usher", "dave", 5),
-    ("Moby-Dick", "dave", 5),
-    ("Moby-Dick", "bob", 4),
-    ("Moby-Dick", "alice", 5),
-    ("Billy Budd, Sailor", "erin", 4),
-    ("Billy Budd, Sailor", "carol", 3),
+    ("Frankenstein; or, The Modern Prometheus", "carol", 5),
+    ("The Adventures of Sherlock Holmes", "bob", 5),
 ]
 
-# (book title, username, review text) - every reviewer has borrowed the book.
+# (book title, username, review text)
 REVIEWS = [
-    (
-        "Pride and Prejudice",
-        "alice",
-        "A sharp, witty romance. The pacing is excellent and the dialogue still sparkles "
-        "more than two centuries later.",
-    ),
-    (
-        "A Tale of Two Cities",
-        "carol",
-        "The opening lines are unforgettable, and the final act is one of the most moving "
-        "conclusions in literature.",
-    ),
-    (
-        "Sense and Sensibility",
-        "bob",
-        "A quieter Austen novel, but the contrast between the two sisters makes it deeply "
-        "thoughtful and rewarding.",
-    ),
-    (
-        "The Time Machine",
-        "erin",
-        "Short, imaginative, and surprisingly dark for its age. A great introduction to "
-        "early science fiction.",
-    ),
-    (
-        "Frankenstein",
-        "carol",
-        "Far more philosophical than the popular image suggests. The monster's voice is "
-        "genuinely moving.",
-    ),
-    (
-        "Moby-Dick",
-        "dave",
-        "Part adventure, part encyclopaedia, part meditation. Demanding but worth the effort.",
-    ),
-    (
-        "The Time Machine",
-        "alice",
-        "A compact classic that raises big questions about class and progress.",
-    ),
-    (
-        "Great Expectations",
-        "bob",
-        "Dickens at his most controlled. Pip's growth feels real and earned.",
-    ),
+    ("Pride and Prejudice", "alice", "A sharp, witty romance. The pacing is excellent."),
+    ("Frankenstein; or, The Modern Prometheus", "carol", "The opening lines are unforgettable."),
 ]
 
 # (book title, username, current_page, total_pages, read_hours_ago)
 READING_PROGRESS = [
     ("Pride and Prejudice", "alice", 42, 250, 2),
-    ("Pride and Prejudice", "bob", 250, 250, 1),
-    ("A Tale of Two Cities", "erin", 300, 300, 0.5),
-    ("Sense and Sensibility", "carol", 88, 180, 3),
-    ("Dracula", "dave", 120, 320, 24),
-    ("Frankenstein", "alice", 60, 200, 5),
+    ("Frankenstein; or, The Modern Prometheus", "bob", 250, 250, 1),
+    ("The Adventures of Sherlock Holmes", "erin", 300, 300, 0.5),
 ]
 
 SUMMARY_MODEL = "gpt-4o-mini"
 SUMMARIES = [
     "Pride and Prejudice",
-    "A Tale of Two Cities",
-    "The Adventures of Huckleberry Finn",
-    "Frankenstein",
-    "The Time Machine",
-    "Dracula",
-    "The Murders in the Rue Morgue",
-    "Moby-Dick",
+    "Frankenstein; or, The Modern Prometheus",
+    "The Adventures of Sherlock Holmes",
 ]
-
 
 # ---------------------------------------------------------------------------
 # Deterministic local PDF generation (no internet, no external assets).
@@ -557,33 +451,32 @@ def build_demo_pdf(book: dict) -> bytes:
 
 
 def _upload_for(book: dict) -> UploadFile:
-    slug = book["title"].lower().replace(" ", "-").replace(",", "")
+    pdf_path = DATA_DIR / book["file"]
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"Missing PDF: {pdf_path}")
+    with open(pdf_path, "rb") as f:
+        file_bytes = f.read()
     return UploadFile(
-        filename=f"{slug}.pdf",
-        file=BytesIO(build_demo_pdf(book)),
+        filename=Path(book["file"]).name,
+        file=BytesIO(file_bytes),
         headers=Headers({"content-type": "application/pdf"}),
     )
 
-
-# ---------------------------------------------------------------------------
-# Seed application.
-# ---------------------------------------------------------------------------
-
-def _count(db, model) -> int:
-    return int(db.scalar(select(func.count()).select_from(model)) or 0)
-
-
 def _table_exists(db) -> bool:
-    return inspect(db.get_bind()).has_table("users")
-
+    try:
+        inspector = inspect(db.get_bind())
+        return "users" in inspector.get_table_names()
+    except Exception:
+        return False
 
 def _validate_seed_shape() -> None:
-    if len(AUTHORS) != 10:
-        raise SystemExit("Seed data invariant failed: expected exactly 10 authors")
-    if len(CATEGORIES) != 8:
-        raise SystemExit("Seed data invariant failed: expected exactly 8 categories")
-    if len(BOOKS) != 20:
-        raise SystemExit("Seed data invariant failed: expected exactly 20 books")
+    if len(AUTHORS) != 15:
+        raise SystemExit("Seed data invariant failed: expected exactly 15 authors")
+    if len(CATEGORIES) != 11:
+        raise SystemExit("Seed data invariant failed: expected exactly 11 categories")
+    demo_books = [book for book in BOOKS if book.get("seed_demo")]
+    if len(demo_books) != 8:
+        raise SystemExit(f"Seed data invariant failed: expected exactly 8 demo books, found {len(demo_books)}")
     isbns = [book["isbn"] for book in BOOKS]
     if len(isbns) != len(set(isbns)):
         raise SystemExit("Seed data invariant failed: book ISBNs must be unique")
@@ -681,7 +574,8 @@ def _seed_books(
     books = {}
     stored_keys: list[str] = []
     try:
-        for definition in BOOKS:
+        demo_books = [b for b in BOOKS if b.get("seed_demo")]
+        for definition in demo_books:
             book = Book(
                 title=definition["title"],
                 isbn=definition["isbn"],
@@ -809,6 +703,9 @@ def _seed_summaries(db, books: dict[str, Book]) -> None:
             )
         )
 
+
+def _count(db, model) -> int:
+    return db.scalar(select(func.count()).select_from(model)) or 0
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

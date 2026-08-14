@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     database_url: str = "postgresql://postgres:password@localhost:5432/elibrary"
-    test_database_url: str = "postgresql://postgres:password@localhost:5432/elibrary_test"
+    test_database_url: str | None = None
 
     jwt_secret_key: str
     jwt_access_token_expire_minutes: int = Field(default=30, gt=0)

@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Classic Literature",
+    "description": "Enduring literary works of historical importance."
+  },
+  {
+    "name": "Romance",
+    "description": "Narrative fiction focusing on romantic relationships."
+  },
+  {
+    "name": "Science Fiction",
+    "description": "Imaginative fiction exploring future science and technology."
+  },
+  {
+    "name": "Horror",
+    "description": "Fiction intended to frighten and unsettle."
+  },
+  {
+    "name": "Mystery & Detective",
+    "description": "Fiction featuring the investigation of a crime or mystery."
+  },
+  {
+    "name": "Gothic Fiction",
+    "description": "Dark fiction featuring mystery, horror, and the supernatural."
+  },
+  {
+    "name": "Drama",
+    "description": "Plays and emotionally charged fiction."
+  },
+  {
+    "name": "Children's Literature",
+    "description": "Literature written specifically for children."
+  },
+  {
+    "name": "Fantasy",
+    "description": "Fiction featuring magical or supernatural elements."
+  },
+  {
+    "name": "Adventure",
+    "description": "Stories of exciting journeys and action."
+  },
+  {
+    "name": "Historical Fiction",
+    "description": "Stories set in the past that incorporate historical facts."
+  }
+]
