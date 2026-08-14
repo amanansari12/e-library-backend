@@ -199,7 +199,7 @@ This interactive CLI tool can safely create a new admin or promote an existing u
 
 ---
 
-# 8. Seed Demo Data
+# 8. Seed Demo Data (Development)
 
 **Development only.**
 To populate the database with a rich demonstration environment, run:
@@ -211,6 +211,26 @@ python scripts/seed.py
 This script reads from `data/book_catalog.json` (specifically filtering for `seed_demo=true`) and seeds exactly 8 default demo books along with representative relational data.
 Current seed output:
 * 6 users, 15 authors, 11 categories, 8 demo books, 8 BookFiles, 8 borrowings, 3 reservations, 3 favorites, 4 ratings, 2 reviews, 3 reading progress, 3 summaries
+
+---
+
+# 9. Production Demo Bootstrap
+
+**Production Interviewer Environment only.**
+To safely populate the deployed interviewer environment, run:
+
+```bash
+python scripts/bootstrap_production_demo.py
+```
+
+While `scripts/seed.py` is exclusively for local development and destroys duplicate environments, `scripts/bootstrap_production_demo.py` is safely idempotent and protects existing production state.
+
+**Behavior:**
+* **Safety**: Requires `APP_ENV=production`. Never drops tables, never downgrades schemas, and skips any existing records.
+* **Books**: Safely imports the exactly 8 demo books (`seed_demo=true`) and matching PDFs using the production `BookFileService` into `BOOK_STORAGE_ROOT`.
+* **Admins**: Safely preserves your manually created production admin (via `create_admin.py`). It never creates a hard-coded admin.
+* **Demo Users**: Creates demo user accounts (alice, bob, carol, dave, erin) required for the interviewer workflow. It requires you to provide the `DEMO_USERS_PASSWORD` environment variable to securely set their credentials without hardcoding secrets.
+* **Relations**: Seeds representative borrowings, reservations, favorites, ratings, reviews, progress, and deterministic cached AI summaries to demonstrate the full application experience.
 
 ---
 
