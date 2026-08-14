@@ -1,14 +1,35 @@
 # E-Library Management System Backend
 
-This repository contains the backend for a modern E-Library Management System. It models the core operations of a physical and digital library, providing robust features for users to explore catalogs, borrow books, manage reservations, read digital copies, and track their reading progress. 
+## Live Deployment
 
-Built with FastAPI and PostgreSQL, the system is designed for high performance and strict type safety. It goes beyond simple CRUD operations by implementing real-world library business logic, such as enforcing borrowing limits, managing waiting lists, deriving reading progress across document versions, and abstracting digital file storage to maintain a clean separation between database metadata and binary assets.
+The backend is currently deployed on Railway.
 
-The backend provides a comprehensive suite of features including role-based authentication, digital access control, user ratings and reviews, AI-generated book summaries, and administrative statistics.
+### Production API
+**Base URL:** https://e-library-backend-production.up.railway.app
+**Health:** https://e-library-backend-production.up.railway.app/health
+**Swagger UI:** https://e-library-backend-production.up.railway.app/docs
+**OpenAPI JSON:** https://e-library-backend-production.up.railway.app/openapi.json
+
+### Production Infrastructure
+- **Hosting:** Railway
+- **Application:** FastAPI
+- **Database:** Railway PostgreSQL
+- **Runtime PDF Storage:** Railway Persistent Volume
+- **Migration Head:** `20260814_0004`
+
+> The production database and runtime storage are separate from the local development environment.
 
 ---
 
-# 1. Project Highlights
+## 1. Project Overview
+
+This is a FastAPI E-Library Management System backend. It models the core operations of a physical and digital library. PostgreSQL stores relational data, while local/runtime storage manages digital PDFs. 
+
+Users borrow books, and their digital access depends on their borrowing state. Reservations manage unavailable books. Users can track reading progress, and can favorite, rate, and review books. Administrators can manage the catalog and view statistics. AI summaries are cached and version-aware. The project includes reusable real public-domain book assets. 
+
+The frontend is not currently part of this repository.
+
+## 2. Features
 
 * JWT authentication
 * Role-based admin authorization
@@ -28,74 +49,36 @@ The backend provides a comprehensive suite of features including role-based auth
 * Reusable real-book catalog
 * Local admin bootstrap
 
----
-
-# 2. Architecture Overview
-
-The system uses a layered architecture, cleanly separating the API transport layer from the core business logic and storage abstractions.
+## 3. Architecture
 
 ```text
-Client / Frontend / Swagger
-            |
-            v
-        FastAPI API
-            |
-    +-------+--------+
-    |       |        |
-    v       v        v
-PostgreSQL Services Storage
-                    |
-                    v
-              storage/books/
+Client / Swagger / Future Frontend
+               |
+               v
+            FastAPI
+               |
+      +--------+---------+
+      |                  |
+      v                  v
+ PostgreSQL         Application Services
+                         |
+                         v
+                  BookFileService
+                         |
+                         v
+                  Runtime PDF Storage
 ```
 
 * **API/router layer**: Defines the HTTP endpoints and handles input validation using Pydantic schemas.
 * **Dependencies/authentication**: Provides reusable dependency injection for database sessions and role-based authentication.
-* **Domain/services**: Contains the core business logic (e.g., borrowing rules, reservation state transitions).
+* **Domain/services**: Contains the core business logic.
 * **SQLAlchemy models**: Defines the database schema and object-relational mapping.
-* **Database**: PostgreSQL manages all relational data (users, metadata, relations).
-* **Storage abstraction**: Manages local digital files securely, shielding binary data from the database.
-* **Seed/data assets**: A curated library catalog used for testing and demonstration.
-* **Tests**: Comprehensive pytest suite running against an isolated PostgreSQL instance.
+* **Database (PostgreSQL)**: Manages all relational data (users, metadata, relations).
+* **Storage abstraction (`BookFileService`)**: Manages local digital files securely, shielding binary data from the database. Digital PDF bytes are not stored directly inside the main `books` table to maintain a clean separation between database metadata and binary assets, allowing efficient file delivery and versioning.
+* **AI client**: Generates AI book summaries.
+* **Tests**: Comprehensive pytest suite.
 
----
-
-# 3. How the Main Book Flow Works
-
-The lifecycle of a book and its digital content is strictly managed:
-
-```text
-Admin creates book
-      ↓
-PDF uploaded
-      ↓
-BookFileService
-      ↓
-SHA-256 integrity check
-      ↓
-storage/books/{book_id}/{storage_key}/canonical.pdf
-      ↓
-BookFile database record
-      ↓
-User borrows book
-      ↓
-PDF retrieval allowed
-```
-
-When a user finishes reading or the borrowing period expires:
-
-```text
-Book returned
-      ↓
-PDF access revoked
-```
-
-The database stores metadata (title, author, `storage_key`, `content_version`) while the local storage layer (`BookFileService`) owns the canonical PDF binary on the filesystem. 
-If an admin uploads a new PDF for an existing book, the `content_version` increments. This invalidates cached AI summaries and flags users' previous reading progress as stale, ensuring they know the content has changed.
-
----
-
-# 4. Project Structure
+## 4. Project Structure
 
 ```text
 e-library-backend/
@@ -124,312 +107,400 @@ e-library-backend/
 ```
 
 * **`app/main.py`**: The FastAPI application entrypoint.
-* **`app/models/` & `app/schemas/`**: SQLAlchemy ORM models and Pydantic validation schemas.
-* **`app/api/` & `app/dependencies/`**: Route definitions and authentication dependency injection.
-* **`app/services/` & `app/storage/`**: Business logic and the local file storage abstraction.
-* **`alembic/`**: Database migration versions.
-* **`scripts/seed.py`**: The default demonstration data bootstrap script.
-* **`scripts/create_admin.py`**: The interactive local admin provisioning tool.
-* **`scripts/validate_catalog.py`**: Integrity checker for the developer source catalog.
-* **`data/` & `data/books/`**: Reusable real-book test assets.
-* **`docs/API_REFERENCE.md`**: Complete REST API endpoint documentation.
-* **`tests/`**: Integration tests using isolated fixture-driven state.
+* **`app/core/config.py`**: Configuration definition.
+* **`app/core/security.py`**: Authentication and security definitions.
+* **`app/api/`**: HTTP endpoints.
+* **`app/services/book_file.py`**: Digital PDF workflow logic.
+* **`app/storage/`**: Runtime storage abstraction.
+* **`scripts/seed.py`**: Development bootstrap script.
+* **`scripts/create_admin.py`**: Admin provisioning tool.
+* **`scripts/bootstrap_production_demo.py`**: Production demo data bootstrap.
+* **`scripts/validate_catalog.py`**: Developer catalog validation.
+* **`scripts/download_and_build_pdfs.py`**: PDF build utility.
+* **`docs/API_REFERENCE.md`**: Complete API documentation.
+* **`docs/BOOK_CATALOG.md`**: 20 real books metadata mapping.
+* **`.env.example`**: Example environment variables.
+* **`requirements.txt`**: Python dependencies.
 
----
+## 5. Configuration
 
-# 5. Configuration
+### Runtime variables
+Variables from `.env.example` configure the application:
+* `APP_ENV`: Application environment (development or production).
+* `DEBUG`: Debug mode toggle.
+* `DATABASE_URL`: Main application database connection URL.
+* `JWT_SECRET_KEY`: Secret key for JWT signing.
+* `AI_API_TOKEN`: Token for Userfacet AI summaries.
+* `CORS_ORIGINS`: Allowed frontend origins.
+* `BOOK_STORAGE_ROOT`: Path to persistent PDF location.
+* `MAX_BOOK_FILE_SIZE_MB`: Max PDF file size upload limit.
+* `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: Access token expiry.
+* `JWT_REFRESH_TOKEN_EXPIRE_DAYS`: Refresh token expiry.
+* `RATE_LIMIT_GLOBAL`, `RATE_LIMIT_LOGIN`, etc.: Rate-limit settings.
 
-Environment variables configure the application. Copy `.env.example` to `.env` to begin.
+### Test-only variable
+* `TEST_DATABASE_URL`: This is only for pytest/test environments and must be a separate database from the application database.
+> **DO NOT CONFIGURE TEST_DATABASE_URL FOR THE PRODUCTION APPLICATION.**
 
-### Runtime configuration
-* `DATABASE_URL`: PostgreSQL connection string for the main application.
-* `JWT_SECRET_KEY`: Secret key for signing authentication tokens.
-* `BOOK_STORAGE_ROOT`: The directory where the runtime manages PDFs (default: `storage/books`).
-* `MAX_BOOK_FILE_SIZE_MB`: Limit for PDF uploads.
-* **AI configuration**: Credentials for external AI summary generation.
-* **CORS configuration**: Allowed origins for frontend clients.
-* **Rate limits**: Request limits for API protection.
-
-### Test-only configuration
-* `TEST_DATABASE_URL`: Used exclusively by `pytest`. This must point to a separate PostgreSQL database to ensure tests do not destroy development data.
-
----
-
-# 6. Local Setup
+## 6. Local Development Setup
 
 Requirements: Python 3.11+ and PostgreSQL 15+.
 
 ```bash
-# 1. Clone the repository
-git clone <repository_url>
+git clone <repository-url>
 cd e-library-backend
 
-# 2. Create and activate a virtual environment
 python -m venv .venv
-# On Windows:
-.venv\Scripts\activate
-# On Linux/macOS:
-source .venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure environment
-cp .env.example .env
-# Edit .env with your PostgreSQL credentials
-
-# 5. Run database migrations
-alembic upgrade head
-
-# 6. Verify migration status (Expected: 20260814_0004)
-alembic current
 ```
 
----
+Windows:
+```powershell
+.venv\Scripts\activate
+```
 
-# 7. Create a Local Admin
+Linux/macOS:
+```bash
+source .venv/bin/activate
+```
 
-The application does not have a public self-admin endpoint for security reasons. To bootstrap a local operator, run:
+Install:
+```bash
+pip install -r requirements.txt
+```
+
+Create `.env` from `.env.example`. Configure your local PostgreSQL.
+
+Run:
+```bash
+alembic upgrade head
+```
+
+Verify:
+```bash
+alembic current
+```
+Expected: `20260814_0004 (head)`
+
+Start:
+```bash
+uvicorn app.main:app --reload
+```
+
+Then:
+* http://localhost:8000/health
+* http://localhost:8000/docs
+
+## 7. Local Admin Setup
 
 ```bash
 python scripts/create_admin.py
 ```
+This is an operator/bootstrap tool. It creates a new admin or can promote an existing user. It supports multiple administrators, prevents duplicate emails, and does not expose a public self-admin API.
 
-This interactive CLI tool can safely create a new admin or promote an existing user. It handles duplicate emails and ensures role-based constraints. Multiple administrators are fully supported.
+Never publish the actual production admin password in README.
 
----
+## 8. Development Demo Seed
 
-# 8. Seed Demo Data (Development)
-
-**Development only.**
-To populate the database with a rich demonstration environment, run:
+**DEVELOPMENT ONLY**
 
 ```bash
 python scripts/seed.py
 ```
 
-This script reads from `data/book_catalog.json` (specifically filtering for `seed_demo=true`) and seeds exactly 8 default demo books along with representative relational data.
-Current seed output:
-* 6 users, 15 authors, 11 categories, 8 demo books, 8 BookFiles, 8 borrowings, 3 reservations, 3 favorites, 4 ratings, 2 reviews, 3 reading progress, 3 summaries
+It reads `data/book_catalog.json`, selects `seed_demo=true`, requires exactly 8 demo books, and creates deterministic development/demo data. It is designed for local development/testing and must NOT be run against production.
 
----
+Current verified output:
+6 users, 15 authors, 11 categories, 8 demo books, 8 BookFiles, 8 borrowings, 3 reservations, 3 favorites, 4 ratings, 2 reviews, 3 reading progress records, 3 book summaries.
 
-# 9. Production Demo Bootstrap
-
-**Production Interviewer Environment only.**
-To safely populate the deployed interviewer environment, run:
-
-```bash
-python scripts/bootstrap_production_demo.py
-```
-
-While `scripts/seed.py` is exclusively for local development and destroys duplicate environments, `scripts/bootstrap_production_demo.py` is safely idempotent and protects existing production state.
-
-**Behavior:**
-* **Safety**: Requires `APP_ENV=production`. Never drops tables, never downgrades schemas, and skips any existing records.
-* **Books**: Safely imports the exactly 8 demo books (`seed_demo=true`) and matching PDFs using the production `BookFileService` into `BOOK_STORAGE_ROOT`.
-* **Admins**: Safely preserves your manually created production admin (via `create_admin.py`). It never creates a hard-coded admin.
-* **Demo Users**: Creates demo user accounts (alice, bob, carol, dave, erin) required for the interviewer workflow. It requires you to provide the `DEMO_USERS_PASSWORD` environment variable to securely set their credentials without hardcoding secrets.
-* **Relations**: Seeds representative borrowings, reservations, favorites, ratings, reviews, progress, and deterministic cached AI summaries to demonstrate the full application experience.
-
----
-
-# 9. Clean Database Reset
-
-**WARNING: destroys development database data. DEVELOPMENT ONLY.**
-
+**Clean Reset (WARNING: destroys development data)**
 ```bash
 alembic downgrade base
 alembic upgrade head
 python scripts/seed.py
 ```
 
----
+## 9. Production Demo Bootstrap
 
-# 10. The 20 Reusable Book Assets
-
-The `data/books/` directory contains 20 real, repository-owned book PDFs.
-* **8 are default demo books** automatically imported by the seed script.
-* **12 are additional developer assets** intended for developers or interviewers to use when manually testing the book creation and PDF upload workflows.
-
-These assets are safely tracked in Git. For a complete list of all 20 titles and their metadata, see `docs/BOOK_CATALOG.md` and `data/book_catalog.json`.
-
----
-
-# 11. Runtime Storage vs Catalog Assets
-
-The repository maintains a strict distinction between source assets and the application's runtime data.
-
-* `data/books/`: Repository-owned source/test assets, safely committed to Git.
-* `storage/books/`: Application-managed runtime storage, strictly ignored by Git.
-
-When the application or seed script imports a book, the `BookFileService` securely copies the file into an isolated hashed directory (`storage/books/{book_id}/{storage_key}/canonical.pdf`). This ensures the application never mutates the repository's source assets.
-
----
-
-# 12. How to Add Another Book
-
-To manually add one of the 12 unseeded developer assets:
-1. Browse `data/book_catalog.json` and choose an unseeded book.
-2. Ensure you have an active Admin token.
-3. Use the `POST /api/v1/books/` endpoint to create the book metadata.
-4. Use the `POST /api/v1/books/{book_id}/file` endpoint to upload the corresponding PDF from `data/books/`.
-5. The `BookFileService` will hash and store it in `storage/books/`.
-6. You can now use a normal user token to test borrowing, PDF retrieval, and reading progress.
-
-See `docs/API_REFERENCE.md` for exact request bodies and responses.
-
----
-
-# 13. Authentication and Authorization
-
-The API uses standard OAuth2 Password Flow with Bearer tokens (JWT). 
-* Public endpoints handle registration and login.
-* Standard protected endpoints require a valid `USER` token.
-* Administrative endpoints require an `ADMIN` role token.
-Users must hold an active borrowing to access a book's PDF or update reading progress. Written reviews also enforce a historical borrowing requirement, and only the owner of a review can update or delete it.
-
----
-
-# 14. Core Domain Workflows
-
-### Borrowing
-Users can borrow up to 5 books. 
-`borrow → active borrowing → PDF access permitted`
-`return → active borrowing closed → PDF access revoked`
-
-### Reservations
-If a book has zero available copies, a user can reserve it. The state begins as `PENDING`. When a copy is returned, the oldest reservation is promoted to `READY`, reserving the copy specifically for that user for 48 hours.
-
-### Reading Progress
-Tracks the user's current `page`, the `total_pages`, and derives a `percentage`. Updates are only permitted during an active borrowing. Progress is bound to a specific `content_version`. If an admin replaces the PDF, progress is marked with a stale flag. After returning the book, the user has read-only access to their final progress.
-
-### Reviews
-Users can leave a maximum of one written review per book, provided they have a borrowing history with that book. Users can only update or delete their own reviews.
-
-### Ratings
-1-5 star ratings. The system aggregates these to expose `average_rating` and `rating_count` on the book metadata.
-
-### Favorites
-Users can bookmark their favorite books to easily retrieve them later.
-
-### AI Summaries
-The system can generate AI summaries for books. Summaries are aggressively cached in the database. If an admin replaces a book's PDF (bumping the `content_version`), the cache is busted and a fresh summary must be generated.
-
----
-
-# 15. API Documentation
-
-Complete API reference: `docs/API_REFERENCE.md`
-
-An interactive Swagger UI is available at runtime:
-`http://localhost:8000/docs`
-
-The API is grouped logically by feature area (Auth, Books, Borrowings, Ratings, Admin Statistics, etc.).
-
----
-
-# 16. Running the Application
+**PRODUCTION BOOTSTRAP ONLY**
 
 ```bash
-uvicorn app.main:app --reload
+python scripts/bootstrap_production_demo.py
 ```
-Health Check: `http://localhost:8000/health`
-Swagger UI: `http://localhost:8000/docs`
 
----
+This initializes a live/interviewer database without resetting it.
 
-# 17. Running Tests
+**Safety**: It requires `APP_ENV=production`, `DATABASE_URL`, and `DEMO_USERS_PASSWORD`. It never drops tables, never downgrades migrations, never deletes existing data, and preserves existing admin accounts.
+
+**Behavior**: It creates only the 8 `seed_demo=true` books, creates required authors/categories, imports PDFs through `BookFileService`, creates representative demo relationships, avoids live AI calls, and is idempotent.
+
+Verified idempotency:
+```text
+Run 1:
+Created: 65
+Skipped: 0
+
+Run 2:
+Created: 0
+Skipped: 65
+```
+
+## 10. Real Book Catalog Assets
+
+`data/books/` contains 20 real public-domain book PDFs:
+* 8 `seed_demo=true` (used by default seed/bootstrap)
+* 12 `seed_demo=false` (reusable manual testing assets)
+
+Metadata lives in `data/book_catalog.json`, authors in `data/authors.json`, categories in `data/categories.json`, and provenance in `data/sources.json`. Detailed mapping is in `docs/BOOK_CATALOG.md`.
+
+Clarification:
+* `data/books/` = repository-owned source assets
+* `storage/books/` = runtime-managed application files
+
+## 11. Runtime PDF Storage
+
+The production path exactly: `/app/storage/books/`
+The application-managed structure: `/app/storage/books/{book_id}/{storage_key}/canonical.pdf`
+
+`BookFileService` manages PDF access. When a PDF is uploaded, it is assigned a SHA-256 checksum and a `storage_key`. It becomes the active BookFile and the `content_version` increments. PDF access control is based on user borrowing status. File replacement increments the `content_version`, invalidating cached AI summaries and flagging existing reading progress records as stale.
+
+Runtime PDF storage must be persistent in production.
+
+## 12. API Documentation
+
+Full reference: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+Local Swagger: http://localhost:8000/docs
+Production Swagger: https://e-library-backend-production.up.railway.app/docs
+OpenAPI JSON: https://e-library-backend-production.up.railway.app/openapi.json is the machine-readable OpenAPI contract.
+
+## 13. Running Tests
 
 ```bash
 pytest -q
 ```
-Tests require `TEST_DATABASE_URL` in your `.env` to point to an isolated PostgreSQL instance. The test suite spins up isolated deterministic fixture states and does not rely on the developer seed data.
-Current verified result: `107 passed`
+Current verified result: `107 passed`. Test isolation is maintained through `TEST_DATABASE_URL`. Tests do not run against production.
 
----
+## 14. Production Deployment
 
-# 18. Security Notes
+```text
+GitHub
+   |
+   v
+Railway
+   |
+   +-------------------+
+   |                   |
+   v                   v
+FastAPI Service     PostgreSQL
+   |
+   v
+Persistent Volume
+/app/storage/books
+```
 
-* `.env` and `storage/` are strictly ignored by Git.
-* Secrets and AI credentials are provided via environment variables.
-* JWT payloads do not leak sensitive user data.
-* Internal filesystem paths and `storage_key` UUIDs are never exposed in public API responses.
-* Administrative endpoints are strongly protected by role checks.
-* There is no public self-admin endpoint.
-* Rate limiting prevents abuse.
-* Request correlation IDs allow secure diagnostic tracing.
-* Errors are wrapped in a safe envelope to prevent stack trace leaks.
+GitHub stores source, Railway hosts FastAPI, Railway PostgreSQL stores relational data, and a Railway Volume stores runtime PDFs.
 
----
+## 15. Railway Deployment Step-by-Step
 
-# 19. Testing Philosophy
+**Step 1: Create Railway account**
+The Railway Google account does NOT need to be the same Google account used for GitHub. The GitHub account connected to Railway must have access to the repository.
 
-The testing strategy emphasizes behavior-driven integration coverage:
-`unit/domain/API integration tests + isolated PostgreSQL test database + clean deterministic fixtures`
-Using a separate database guarantees that destructive tests never damage the developer's local seed data, ensuring a reliable local development loop.
+**Step 2: Create a Railway project**
+Use: `New Project → GitHub Repository → amanansari12/e-library-backend`
 
----
+**Step 3: Deploy the repository**
+Deploy the GitHub repository as the FastAPI service.
 
-# 20. Important Files to Read First
+**Step 4: Configure Python**
+Set: `RAILPACK_PYTHON_VERSION=3.11` for reproducible compatibility.
 
-If you are reviewing this project, start here in order:
-1. `README.md` - Overall system context (you are here).
-2. `architecture.md` - Deeper technical architecture decisions.
-3. `app/main.py` - Application bootstrapping and middleware configuration.
-4. `app/dependencies/auth.py` - Role-based authorization implementation.
-5. `app/api/v1/books.py` - Core router demonstrating dependency injection.
-6. `app/services/book_file.py` - Domain logic bridging DB metadata and binary storage.
-7. `app/storage/local.py` - The low-level filesystem abstraction.
-8. `app/models/` - SQLAlchemy schemas defining relational constraints.
-9. `scripts/seed.py` - Demonstrates how the data models interconnect.
-10. `scripts/create_admin.py` - The secure bootstrapping utility.
-11. `docs/API_REFERENCE.md` - The complete capability surface area.
-12. `tests/` - Example of isolated fixture-based integration testing.
+**Step 5: Configure start command**
+Use: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+Do NOT use `python main.py`.
 
----
+**Step 6: Add PostgreSQL**
+In the same Railway project add: `PostgreSQL`
 
-# 21. Interviewer Quick Start
+**Step 7: Connect the database**
+Set the backend: `DATABASE_URL=${{Postgres.DATABASE_URL}}`
 
-1. Clone the repository.
-2. Configure PostgreSQL and your `.env` file.
-3. Install dependencies (`pip install -r requirements.txt`).
+**Step 8: Configure production environment variables**
+Document the required variables (see Section 16). Do not expose example production secrets. Do not configure `TEST_DATABASE_URL` for the live application.
+
+**Step 9: Generate JWT secret**
+Safe local command:
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+The result belongs only in Railway Variables.
+
+**Step 10: Run migrations**
+After connecting PostgreSQL, open the Railway service Console:
+```bash
+alembic upgrade head
+alembic current
+alembic check
+```
+Expected head: `20260814_0004 (head)`
+Expected check: `No new upgrade operations detected.`
+**IMPORTANT**: Never run `alembic downgrade base` against Railway.
+
+**Step 11: Configure persistent PDF storage**
+Create a Railway Volume attached to `e-library-backend`.
+Use mount path: `/app/storage/books`
+Set: `BOOK_STORAGE_ROOT=/app/storage/books`
+This volume is required because runtime PDF files must survive container restarts/redeployments.
+
+**Step 12: Verify volume**
+Open Railway Console: `ls -la /app/storage/books` and verify it is writable. Do not keep temporary test files.
+
+**Step 13: Create production admin**
+Run: `python scripts/create_admin.py`
+Use a production email, a strong unique password, and never commit those credentials. Production admin is created separately from demo users.
+
+**Step 14: Add production demo password**
+Set in Railway Variables: `DEMO_USERS_PASSWORD=<secure demo password>`. Do not put this value in GitHub.
+
+**Step 15: Deploy the latest bootstrap script**
+Push the repository containing `scripts/bootstrap_production_demo.py` and wait for Railway to deploy the latest commit.
+
+**Step 16: Run production demo bootstrap**
+In Railway Console: `python scripts/bootstrap_production_demo.py`
+Expected: `Production demo bootstrap complete.`
+
+**Step 17: Verify production statistics**
+Open production Swagger, log in as production admin, and call `GET /api/v1/admin/statistics`. The response should show non-zero demo data.
+
+**Step 18: Verify health**
+Open `/health`. Expected HTTP 200.
+
+**Step 19: Verify Swagger**
+Open `/docs`. Verify all API groups are visible.
+
+**Step 20: Verify real PDF flow**
+Use a seeded book. Test: login → borrow → GET /books/{book_id}/file → receive PDF → update reading progress → return → GET /books/{book_id}/file → 403. This verifies PostgreSQL, authentication, borrowing, BookFileService, persistent storage, PDF access control, reading progress, and return behavior.
+
+## 16. Production Environment Variables
+
+| Variable | Required | Production Purpose |
+|----------|----------|-------------------|
+| `APP_ENV` | Yes | Enables production safeguards |
+| `DEBUG` | Yes | Must be false |
+| `DATABASE_URL` | Yes | Railway PostgreSQL |
+| `JWT_SECRET_KEY` | Yes | JWT signing |
+| `AI_API_TOKEN` | Yes if AI features enabled | Userfacet AI |
+| `CORS_ORIGINS` | Yes | Allowed frontend |
+| `BOOK_STORAGE_ROOT` | Yes | Persistent PDF location |
+| `MAX_BOOK_FILE_SIZE_MB` | Configured | Upload protection |
+| `DEMO_USERS_PASSWORD` | Only for bootstrap | Demo-user credentials |
+| `TEST_DATABASE_URL` | No | Local/CI tests only |
+
+## 17. Production Database Initialization
+See Step 10 in Section 15.
+
+## 18. Production Admin Setup
+See Step 13 in Section 15.
+
+## 19. Production Demo Data Setup
+See Step 16 in Section 15.
+
+## 20. Production PDF Storage
+See Step 11 in Section 15.
+
+## 21. Production Verification
+See Steps 17-20 in Section 15.
+
+## 22. Common Deployment Problems
+
+**Missing JWT_SECRET_KEY**
+Symptom: `pydantic ValidationError jwt_secret_key Field required`
+Fix: Add `JWT_SECRET_KEY` to Railway Variables.
+
+**Railway cannot detect/build the Python app**
+Use: `RAILPACK_PYTHON_VERSION=3.11` and `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+**Database has no tables**
+Run: `alembic upgrade head`. Do NOT manually create tables.
+
+**PDF uploads disappear**
+Cause: Runtime storage is not mounted persistently.
+Fix: Attach a Railway Volume at `/app/storage/books` and set `BOOK_STORAGE_ROOT=/app/storage/books`.
+
+**API starts but production database is empty**
+Run: `python scripts/bootstrap_production_demo.py` after configuring `APP_ENV=production` and `DEMO_USERS_PASSWORD`. Do NOT use the development seed.
+
+## 23. Security Rules
+
+**Never do these in production:**
+* DO NOT run: `alembic downgrade base`
+* DO NOT run: `python scripts/seed.py`
+* DO NOT commit: `.env`
+* DO NOT commit: production credentials
+* DO NOT use: `TEST_DATABASE_URL` for the live application
+* DO NOT remove: persistent PDF volume
+* DO NOT expose: `JWT_SECRET_KEY`, `AI_API_TOKEN`, `DEMO_USERS_PASSWORD`
+
+## 24. Interviewer Quick Start
+
+**For local:**
+1. Create PostgreSQL
+2. Configure `.env`
+3. Install requirements
 4. `alembic upgrade head`
 5. `python scripts/create_admin.py`
 6. `python scripts/seed.py`
 7. `uvicorn app.main:app --reload`
-8. Open `http://localhost:8000/docs`
+8. Open `/docs`
 
-Recommended demonstration flow:
-`Browse books → Login → Borrow → Retrieve PDF → Update reading progress → Favorite → Rate/review → Return → Verify PDF access is revoked → Inspect reservations → Login as admin → View admin statistics → Open API reference`
+**For the hosted demo:**
+1. Open https://e-library-backend-production.up.railway.app
+2. Open `/docs`
+3. Login
+4. Browse seeded books
+5. Borrow a book
+6. Retrieve the PDF
+7. Update reading progress
+8. Rate/review
+9. Return the book
+10. Verify PDF access is revoked
+11. Open admin statistics
 
----
+## 25. Important Files to Read
 
-# 22. Current Project Status
+| File | Why it matters |
+|------|----------------|
+| `app/main.py` | FastAPI entrypoint |
+| `app/core/config.py` | configuration |
+| `app/core/security.py` | authentication/security |
+| `app/api/` | HTTP endpoints |
+| `app/services/book_file.py` | digital PDF workflow |
+| `app/storage/` | runtime storage abstraction |
+| `app/models/` | database models |
+| `scripts/seed.py` | development bootstrap |
+| `scripts/create_admin.py` | admin provisioning |
+| `scripts/bootstrap_production_demo.py` | production demo bootstrap |
+| `scripts/validate_catalog.py` | catalog validation |
+| `data/book_catalog.json` | catalog source of truth |
+| `docs/API_REFERENCE.md` | complete endpoint reference |
+| `docs/BOOK_CATALOG.md` | 20 real books |
+| `tests/` | integration tests |
 
-Current status:
-* Feature-frozen backend
-* Migration head: `20260814_0004`
-* Automated tests: 107 passing
-* 20 reusable real-book assets
-* 8 default demo books
-* 12 additional developer assets
+## 26. Current Project Status
 
----
+```text
+Backend: LIVE
+Platform: Railway
+Database: Railway PostgreSQL
+Migration: 20260814_0004
+Tests: 107 passed
+Catalog assets: 20
+Default demo books: 8
+Production demo bootstrap: verified
+Persistent PDF storage: configured
+Swagger: live
+Health endpoint: live
+```
+The backend is currently deployed independently. A separate React/TypeScript frontend can consume the REST API.
 
-# 23. Future Considerations
+## 27. Future Considerations
 
-The following technologies were intentionally omitted to maintain focus on core library modeling and minimize deployment complexity:
-* Docker
-* Redis
-* Celery / Kafka
-* Elasticsearch
-* WebSockets
-* Microservices
-
----
-
-# 24. Frontend Note
-
-Frontend:
-A separate React/TypeScript client can consume this REST API. There is currently no frontend implemented within this backend repository.
+The following technologies were intentionally omitted to maintain focus on core library modeling and minimize deployment complexity: Docker, Redis, Celery / Kafka, Elasticsearch, WebSockets, Microservices.
